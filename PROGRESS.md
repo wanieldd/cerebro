@@ -156,12 +156,24 @@ User → React App → FastAPI → OpenRouter
 - [x] Pale dark blue theme (full Tailwind v4 @theme)
 - [x] Model search focus fix (modelFilter localized to ModelSelector)
 - [x] Hook ordering fix (all useCallback + useEffect before early returns to prevent error #310)
+- [x] Stop generation button (square/stop appears during streaming, AbortController wired)
+- [x] Delete confirmation dialog (ConfirmDialog modal with backdrop blur)
+- [x] API key sidebar warning stays reactive (state synced to localStorage)
+- [x] Sidebar branding (Cerebro wordmark: icon + serif title)
+- [x] Welcome empty state with suggested prompt chips (5 built-in + custom prompts)
+- [x] User bubble polish (rounded-2xl, px-5 py-3, pill shape)
+- [x] Message timestamps (11px tabular-nums at 60% opacity)
+- [x] GitHub repo created: https://github.com/wanieldd/cerebro
+- [x] Port changed to 3333 (won't conflict with Hermes on 8000)
 
 ### ❌ Not Yet Done
 - [ ] Resubmit race condition
 - [ ] Compact mode wiring
 - [ ] Mobile responsive
-- [ ] Vision model actually used for image reading (header flows to backend, not yet consumed)
+- [ ] Vision model actually wired (base_url + multimodal content partially done, still needs llm_client.py image handling)
+- [ ] Toast/notification system
+- [ ] Manual model input debounce
+- [ ] CSS variables still named --color-mustard despite being blue
 
 ---
 
@@ -174,6 +186,20 @@ User → React App → FastAPI → OpenRouter
 ---
 
 ## Recent Changes
+
+### 2026-07-25 — Stop generation + delete confirm + UI polish (major session)
+- **Files:** `App.tsx`, `ChatView.tsx`, `ChatInput.tsx`, `client.ts`, `MessageBubble.tsx`, `ConfirmDialog.tsx` (new), `agent.py`, `main.py`, `.gitignore`, `README.md`
+- Stop generation: AbortController wired through App→ChatView→ChatInput. Send button becomes red square during streaming
+- Delete confirmation: ConfirmDialog modal with backdrop blur, cancel/delete buttons
+- API key reactivity: converted `apiKey` to state synced with localStorage. Sidebar warning updates after leaving Settings
+- Sidebar branding: Cerebro wordmark (icon + serif title) at top of sidebar above search bar
+- Welcome empty state: 5 suggested prompt chips with icons instead of bare text
+- User bubble: rounded-2xl (16px pill), px-5 py-3, softer
+- Timestamps: 11px tabular-nums at 60% opacity (was 10px 50%)
+- Vision model partially wired: base_url flows from main.py → agent.py. Still needs multimodal content construction in llm_client.py
+- Port changed to 3333 across all files (launch.py, agent.py, main.py, test_v2.py, start_tunnel.py, PROGRESS.md)
+- GitHub repo: https://github.com/wanieldd/cerebro — .gitignore, README.md with setup instructions, initial commit pushed
+- Confirmed all changes build clean (zero TS errors, zero lint warnings)
 
 ### 2026-07-25 — Auto-memory system prompt
 - **Files:** `backend/agent.py`
