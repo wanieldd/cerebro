@@ -1,41 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+*.egg
+
+# Node
+frontend/node_modules/
+frontend/dist/
 
 # Database
-# Hermes
-# IDE
-# Node
-# OS
-# Python
-# Temp
-# Test artifacts
-# Uploads
-*.bak
+backend/data/*.db
 *.db-journal
 *.db-wal
-*.egg
-*.egg-info/
-*.logPROGRESS.md
-*.py[cod]
-*.swo
-*.swp
-*.test-backup
-.DS_Store
-.hermes/
+
+# IDE
 .idea/
-.venv/
 .vscode/
-/tmp/
-BUILD-backend.md
-BUILD.md
+*.swp
+*.swo
+
+# OS
+.DS_Store
 Thumbs.db
-__pycache__/
-backend/data/*.db
+
+# Temp
+/tmp/
+*.log
+*.bak
+*.test-backup
+
+# Uploads
 backend/data/uploads/*
-backend/run_live_tests.py
-backend/tests/debug2.py
-backend/tests/debug3.py
-backend/tests/quick_debug.py
+
+# Test artifacts
 backend/tests/test_comprehensive.py
 backend/tests/test_live_chat.py
-frontend/dist/
-frontend/node_modules/
-venv/
+backend/tests/quick_debug.py
+backend/tests/debug2.py
+backend/tests/debug3.py
+backend/run_live_tests.py
+
+# Build specs
+BUILD.md
+BUILD-backend.md
+
+# Hermes
+.hermes/
+
+# Handoff docs
+PROGRESS.md
