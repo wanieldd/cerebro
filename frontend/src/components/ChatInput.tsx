@@ -7,6 +7,7 @@ interface ChatInputProps {
   onSend: (content: string, params?: ChatParams) => Promise<void>
   onStop: () => void
   isLoading: boolean
+  pendingPrompt?: string | null
 }
 
 const REASONING_OPTIONS = [
@@ -24,7 +25,7 @@ interface PastedItem {
   type: 'image' | 'file'
 }
 
-export default function ChatInput({ onSend, onStop, isLoading }: ChatInputProps) {
+export default function ChatInput({ onSend, onStop, isLoading, pendingPrompt }: ChatInputProps) {
   const [value, setValue] = useState('')
   const [showParams, setShowParams] = useState(false)
   const [reasoningEffort, setReasoningEffort] = useState(() => localStorage.getItem('chat_reasoning') || '')
@@ -41,6 +42,13 @@ export default function ChatInput({ onSend, onStop, isLoading }: ChatInputProps)
       textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 8 * 1.5 * 16) + 'px'
     }
   }, [value])
+
+  useEffect(() => {
+    if (pendingPrompt && textareaRef.current) {
+      setValue(pendingPrompt)
+      textareaRef.current.focus()
+    }
+  }, [pendingPrompt])
 
   const handleSend = async () => {
     if (isLoading) return
@@ -176,7 +184,7 @@ export default function ChatInput({ onSend, onStop, isLoading }: ChatInputProps)
                     onClick={() => setReasoningEffort(opt.value)}
                     className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs transition-colors ${
                       active
-                        ? 'bg-mustard/20 text-mustard-light border border-mustard/30'
+                        ? 'bg-blue/20 text-blue-light border border-blue/30'
                         : 'text-warm-muted hover:bg-warm-elevated border border-transparent'
                     }`}
                   >
@@ -247,14 +255,14 @@ export default function ChatInput({ onSend, onStop, isLoading }: ChatInputProps)
             </button>
             <button
               onClick={() => setWebSearch(!webSearch)}
-              className={`p-2 transition-colors ${webSearch ? 'text-mustard' : 'text-warm-muted hover:text-warm-text'}`}
+              className={`p-2 transition-colors ${webSearch ? 'text-blue' : 'text-warm-muted hover:text-warm-text'}`}
               title="Web search"
             >
               <Globe size={18} />
             </button>
             <button
               onClick={() => setShowParams(!showParams)}
-              className={`p-2 transition-colors ${showParams ? 'text-mustard' : 'text-warm-muted hover:text-warm-text'}`}
+              className={`p-2 transition-colors ${showParams ? 'text-blue' : 'text-warm-muted hover:text-warm-text'}`}
               title="Reasoning effort"
             >
               <Brain size={18} />
@@ -269,7 +277,7 @@ export default function ChatInput({ onSend, onStop, isLoading }: ChatInputProps)
             placeholder="Type a message... (Shift+Enter for newline)"
             disabled={isLoading}
             rows={1}
-            className="flex-1 bg-warm-surface border border-warm-border rounded-xl px-4 py-3 text-warm-text placeholder-warm-muted resize-none focus:outline-none focus:ring-2 focus:ring-mustard disabled:opacity-50 text-sm"
+            className="flex-1 bg-warm-surface border border-warm-border rounded-xl px-4 py-3 text-warm-text placeholder-warm-muted resize-none focus:outline-none focus:ring-2 focus:ring-blue disabled:opacity-50 text-sm"
           />
 
           <button
@@ -278,7 +286,7 @@ export default function ChatInput({ onSend, onStop, isLoading }: ChatInputProps)
             className={`p-3 rounded-xl transition-colors font-medium ${
               isLoading
                 ? 'bg-warm-danger text-white hover:bg-red-600'
-                : 'bg-mustard text-black hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed'
+                : 'bg-blue text-black hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed'
             }`}
             title={isLoading ? 'Stop generating' : 'Send message'}
           >

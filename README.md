@@ -1,6 +1,6 @@
 # Cerebro
 
-Your AI assistant with tools and memory — runs locally on your machine.
+Your AI assistant with tools and memory -- runs locally on your machine.
 
 ## Quick Start
 
@@ -31,13 +31,13 @@ Then open **http://localhost:3333** in your browser.
 ## Features
 
 - **Streaming chat** with markdown rendering
-- **Tools** — Python execution, terminal, file operations, web search
-- **Persistent memory** — AI remembers facts across conversations
-- **Vision model support** — paste images into chat
-- **Account system** — local signup/login with SHA-256 passwords
-- **Model browser** — search and select from all OpenRouter models
-- **Conversations** — folders, search, auto-title
-- **Dark theme** — pale dark blue, easy on the eyes
+- **Tools** -- Python execution, terminal, file operations, web search
+- **Persistent memory** -- AI remembers facts across conversations
+- **Vision model support** -- paste images into chat
+- **Account system** -- local signup/login with SHA-256 passwords
+- **Model browser** -- search and select from all OpenRouter models
+- **Conversations** -- folders, search, auto-title
+- **Dark theme** -- pale dark blue, easy on the eyes
 
 ## Tech Stack
 

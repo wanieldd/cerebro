@@ -35,7 +35,7 @@ export default function ModelSelector({ models, model, onModelSelect, onToggleMa
         type="text" value={model}
         onChange={(e) => onModelSelect(e.target.value)}
         placeholder="Type model ID..."
-        className="w-full bg-warm-bg border border-warm-border rounded-lg px-3 py-2 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-mustard"
+        className="w-full bg-warm-bg border border-warm-border rounded-lg px-3 py-2 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-blue"
       />
     )
   }
@@ -49,7 +49,7 @@ export default function ModelSelector({ models, model, onModelSelect, onToggleMa
             type="text" value={modelFilter}
             onChange={(e) => setModelFilter(e.target.value)}
             placeholder="Search models..."
-            className="w-full bg-warm-bg border border-warm-border rounded-lg pl-8 pr-3 py-2 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-mustard"
+            className="w-full bg-warm-bg border border-warm-border rounded-lg pl-8 pr-3 py-2 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-blue"
           />
         </div>
       )}
@@ -66,7 +66,7 @@ export default function ModelSelector({ models, model, onModelSelect, onToggleMa
               onClick={() => onModelSelect(m.id)}
               className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
                 model === m.id
-                  ? 'bg-mustard/15 text-mustard border border-mustard/25'
+                  ? 'bg-blue/15 text-blue border border-blue/25'
                   : 'text-warm-text hover:bg-warm-elevated'
               }`}
             >

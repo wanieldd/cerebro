@@ -70,10 +70,18 @@ async def init_db() -> None:
                 id TEXT PRIMARY KEY,
                 user_id TEXT NOT NULL,
                 created_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL DEFAULT '',
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             );
         """)
         await db.commit()
+
+        # Safe migration: add expires_at column to sessions
+        try:
+            await db.execute("ALTER TABLE sessions ADD COLUMN expires_at TEXT DEFAULT ''")
+            await db.commit()
+        except Exception:
+            pass
 
         # Safe migration: add folder column if missing
         try:
@@ -500,9 +508,11 @@ async def create_session(user_id: str) -> str:
     try:
         token = uuid.uuid4().hex
         now = _now()
+        from datetime import timedelta
+        expires_at = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
         await db.execute(
-            "INSERT INTO sessions (id, user_id, created_at) VALUES (?, ?, ?)",
-            (token, user_id, now),
+            "INSERT INTO sessions (id, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
+            (token, user_id, now, expires_at),
         )
         await db.commit()
         return token
@@ -519,8 +529,8 @@ async def get_session(token: str) -> dict | None:
                       u.id, u.username, u.display_name, u.created_at
                FROM sessions s
                JOIN users u ON u.id = s.user_id
-               WHERE s.id = ?""",
-            (token,),
+               WHERE s.id = ? AND (s.expires_at = '' OR s.expires_at > ?)""",
+            (token, _now()),
         )
         row = await cur.fetchone()
         return dict(row) if row else None

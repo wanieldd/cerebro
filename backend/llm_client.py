@@ -1,6 +1,7 @@
 """LLM client for OpenRouter (OpenAI-compatible API)."""
 
 import json
+import re
 
 import httpx
 
@@ -201,8 +202,43 @@ class LLMClient:
             return False
 
 
+def extract_image_urls(text: str, base_url: str) -> tuple[str, list[dict]]:
+    """Extract image markdown from text. Returns (clean_text, image_blocks)."""
+    pattern = r'!\[([^\]]*)\]\(([^)]+)\)'
+    parts = re.split(pattern, text)
+    clean_text = ""
+    image_blocks = []
+
+    for i in range(0, len(parts), 3):
+        clean_text += parts[i]
+        if i + 2 < len(parts):
+            alt_text = parts[i + 1]
+            img_url = parts[i + 2]
+            # Make absolute URL
+            if img_url.startswith('/'):
+                img_url = base_url.rstrip('/') + img_url
+            image_blocks.append({
+                "type": "image_url",
+                "image_url": {"url": img_url, "detail": "auto"},
+            })
+
+    return clean_text, image_blocks
+
+
+def build_multimodal_content(text: str, image_blocks: list[dict]) -> list[dict]:
+    """Build multimodal content array with text and images."""
+    content = []
+    if text:
+        content.append({"type": "text", "text": text})
+    content.extend(image_blocks)
+    return content if len(content) > 1 else text
+
+
 def build_messages(
-    history: list[dict], memory_context: str | None = None
+    history: list[dict],
+    memory_context: str | None = None,
+    image_model: str | None = None,
+    base_url: str = "http://localhost:3333",
 ) -> list[dict]:
     """Build the messages array for the LLM call."""
     msgs = [
@@ -221,7 +257,18 @@ def build_messages(
             # Tool role messages need content
             msgs.append({"role": "tool", "content": content})
         else:
-            msg: dict = {"role": role, "content": content}
+            msg: dict = {"role": role}
+
+            # Check for images in user messages if image_model is set
+            if role == "user" and image_model and content:
+                clean_text, image_blocks = extract_image_urls(content, base_url)
+                if image_blocks:
+                    msg["content"] = build_multimodal_content(clean_text, image_blocks)
+                else:
+                    msg["content"] = content
+            else:
+                msg["content"] = content
+
             if m.get("tool_calls"):
                 msg["tool_calls"] = [
                     {

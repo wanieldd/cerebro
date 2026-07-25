@@ -1,36 +1,41 @@
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-.venv/
-venv/
-*.egg
-
-# Node
-frontend/node_modules/
-frontend/dist/
 
 # Database
-backend/data/*.db
+# Hermes
+# IDE
+# Node
+# OS
+# Python
+# Temp
+# Test artifacts
+# Uploads
+*.bak
 *.db-journal
 *.db-wal
-
-# Uploads
-backend/data/uploads/*
-
-# OS
-.DS_Store
-Thumbs.db
-
-# IDE
-.vscode/
-.idea/
-*.swp
+*.egg
+*.egg-info/
+*.logPROGRESS.md
+*.py[cod]
 *.swo
-
-# Hermes
+*.swp
+*.test-backup
+.DS_Store
 .hermes/
-
-# Temp
+.idea/
+.venv/
+.vscode/
 /tmp/
-*.log
+BUILD-backend.md
+BUILD.md
+Thumbs.db
+__pycache__/
+backend/data/*.db
+backend/data/uploads/*
+backend/run_live_tests.py
+backend/tests/debug2.py
+backend/tests/debug3.py
+backend/tests/quick_debug.py
+backend/tests/test_comprehensive.py
+backend/tests/test_live_chat.py
+frontend/dist/
+frontend/node_modules/
+venv/

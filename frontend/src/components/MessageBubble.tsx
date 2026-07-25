@@ -52,7 +52,7 @@ export default function MessageBubble({ message, onEdit }: MessageBubbleProps) {
           {isLong && (
             <button
               onClick={() => setExpanded(!expanded)}
-              className="text-mustard hover:text-mustard-light mt-1 text-xs transition-colors"
+              className="text-blue hover:text-blue-light mt-1 text-xs transition-colors"
             >
               {expanded ? 'Show less' : 'Show more'}
             </button>
@@ -90,7 +90,7 @@ export default function MessageBubble({ message, onEdit }: MessageBubbleProps) {
 
         {/* Edit mode (user messages only) */}
         {editing && (
-          <div className="bg-warm-surface border border-mustard rounded-xl p-2">
+          <div className="bg-warm-surface border border-blue rounded-xl p-2">
             <textarea
               value={editContent}
               onChange={(e) => setEditContent(e.target.value)}
@@ -101,7 +101,7 @@ export default function MessageBubble({ message, onEdit }: MessageBubbleProps) {
             <div className="flex gap-2 mt-2">
               <button
                 onClick={handleSaveEdit}
-                className="p-1.5 bg-mustard text-black rounded-lg hover:opacity-90 transition-opacity font-medium text-xs"
+                className="p-1.5 bg-blue text-black rounded-lg hover:opacity-90 transition-opacity font-medium text-xs"
               >
                 <Send size={14} />
               </button>
@@ -120,7 +120,7 @@ export default function MessageBubble({ message, onEdit }: MessageBubbleProps) {
           {message.content && (
             <button
               onClick={handleCopy}
-              className="text-warm-muted hover:text-mustard p-0.5"
+              className="text-warm-muted hover:text-blue p-0.5"
               title="Copy"
             >
               {copied ? <Check size={11} /> : <Copy size={11} />}
@@ -129,7 +129,7 @@ export default function MessageBubble({ message, onEdit }: MessageBubbleProps) {
           {isUser && onEdit && !editing && (
             <button
               onClick={() => { setEditing(true); setEditContent(message.content) }}
-              className="text-warm-muted hover:text-mustard p-0.5"
+              className="text-warm-muted hover:text-blue p-0.5"
               title="Edit"
             >
               <Pencil size={11} />

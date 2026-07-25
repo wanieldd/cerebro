@@ -45,8 +45,8 @@ export default function SignIn({ onSignIn, onSwitchToSignup }: SignInProps) {
       <div className="w-full max-w-md">
         <div className="bg-warm-surface border border-warm-border rounded-2xl p-8">
           <div className="text-center mb-6">
-            <div className="w-16 h-16 bg-mustard/15 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <Sparkles size={28} className="text-mustard" />
+            <div className="w-16 h-16 bg-blue/15 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <Sparkles size={28} className="text-blue" />
             </div>
             <h1 className="text-2xl font-bold text-warm-text" style={{ fontFamily: 'var(--font-serif)' }}>
               Welcome back
@@ -65,7 +65,7 @@ export default function SignIn({ onSignIn, onSwitchToSignup }: SignInProps) {
                 onKeyDown={handleKeyDown}
                 placeholder="your-username"
                 autoFocus
-                className="w-full bg-warm-bg border border-warm-border rounded-lg px-4 py-2.5 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-mustard"
+                className="w-full bg-warm-bg border border-warm-border rounded-lg px-4 py-2.5 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-blue"
               />
             </div>
             <div>
@@ -76,7 +76,7 @@ export default function SignIn({ onSignIn, onSwitchToSignup }: SignInProps) {
                   onChange={(e) => setPassword(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Your password"
-                  className="w-full bg-warm-bg border border-warm-border rounded-lg px-4 py-2.5 pr-10 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-mustard"
+                  className="w-full bg-warm-bg border border-warm-border rounded-lg px-4 py-2.5 pr-10 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-blue"
                 />
                 <button
                   onClick={() => setShowPassword(!showPassword)}
@@ -96,7 +96,7 @@ export default function SignIn({ onSignIn, onSwitchToSignup }: SignInProps) {
             <button
               onClick={handleSignIn}
               disabled={loading}
-              className="w-full py-2.5 bg-mustard text-black rounded-lg hover:opacity-90 transition-all font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full py-2.5 bg-blue text-black rounded-lg hover:opacity-90 transition-all font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading ? 'Signing in...' : 'Sign In'}
               {!loading && <LogIn size={16} />}
@@ -104,7 +104,7 @@ export default function SignIn({ onSignIn, onSwitchToSignup }: SignInProps) {
 
             <p className="text-center text-xs text-warm-muted pt-2">
               Don't have an account?{' '}
-              <button onClick={onSwitchToSignup} className="text-mustard hover:text-mustard-light underline">
+              <button onClick={onSwitchToSignup} className="text-blue hover:text-blue-light underline">
                 Create one
               </button>
             </p>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { MessageSquare, Plus, Trash2, Brain, Settings as SettingsIcon, Search, Key, FileText } from 'lucide-react'
+import { MessageSquare, Plus, Trash2, Brain, Settings as SettingsIcon, Search, Key, FileText, AlertTriangle } from 'lucide-react'
 import type { Conversation, Message as MessageType, SSEEvent, Prompt, ChatParams } from './types'
 import * as api from './api/client'
 import type { AuthStatus } from './api/client'
@@ -11,11 +11,13 @@ import OnboardingWizard from './components/OnboardingWizard'
 import SignIn from './components/SignIn'
 
 import ConfirmDialog from './components/ConfirmDialog'
+import { ToastProvider, useToast } from './components/Toast'
 
 type Page = 'chat' | 'settings' | 'memories' | 'prompts'
-type AuthState = 'loading' | 'onboarding' | 'signin' | 'authenticated'
+type AuthState = 'loading' | 'onboarding' | 'signin' | 'authenticated' | 'connection_error'
 
-export default function App() {
+function AppInner() {
+  const { addToast } = useToast()
   const [authState, setAuthState] = useState<AuthState>('loading')
   const [page, setPage] = useState<Page>('chat')
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -33,7 +35,9 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [deleteConfirming, setDeleteConfirming] = useState<string | null>(null)
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('hermes_ui_api_key') || '')
+  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const generationRef = useRef(0)
 
   // Auth check
   useEffect(() => {
@@ -46,8 +50,7 @@ export default function App() {
         setAuthState('authenticated')
       }
     }).catch(() => {
-      // If server unreachable, assume local mode — skip auth
-      setAuthState('authenticated')
+      setAuthState('connection_error')
     })
   }, [])
 
@@ -135,11 +138,16 @@ export default function App() {
     }
     setConversations((prev) => prev.filter((c) => c.id !== id))
     if (activeConvId === id) { setActiveConvId(null); setMessages([]) }
+    addToast('Conversation deleted', 'success')
   }, [deleteConfirming, activeConvId])
 
   const handleSendMessage = useCallback(async (content: string, params?: ChatParams) => {
     if (isStreaming) return
     setError(null)
+
+    generationRef.current += 1
+    const gen = generationRef.current
+    abortRef.current?.abort()
 
     const controller = new AbortController()
     abortRef.current = controller
@@ -151,7 +159,11 @@ export default function App() {
       setActiveConvId(conv.id)
       convId = conv.id
     }
-    if (!apiKey) { setPage('settings'); return }
+    if (!apiKey) {
+      setError('Set your API key in Settings to send messages')
+      setIsStreaming(false)
+      return
+    }
 
     setIsStreaming(true)
     setStreamingContent('')
@@ -173,6 +185,7 @@ export default function App() {
         auto_memory: autoMemory,
         system_prompt: systemPrompt || undefined,
       })) {
+        if (gen !== generationRef.current) return
         if (event.type === 'token') {
           accumulated += event.content || ''
           setStreamingContent(accumulated)
@@ -201,6 +214,7 @@ export default function App() {
         }
       }
     } catch (err: unknown) {
+      if (gen !== generationRef.current) return
       if (err instanceof DOMException && err.name === 'AbortError') return
       setError(err instanceof Error ? err.message : 'Request failed')
       setMessages((prev) => prev.filter((m) => m.id !== 'streaming-placeholder'))
@@ -215,6 +229,10 @@ export default function App() {
     await api.editMessage(messageId, newContent)
     const convId = activeConvId
     if (!convId) return
+
+    generationRef.current += 1
+    const gen = generationRef.current
+    abortRef.current?.abort()
 
     const controller = new AbortController()
     abortRef.current = controller
@@ -231,6 +249,7 @@ export default function App() {
     try {
       let accumulated = ''
       for await (const event of api.streamResubmit(convId, newContent, apiKey, model || undefined, controller.signal)) {
+        if (gen !== generationRef.current) return
         if (event.type === 'token') {
           accumulated += event.content || ''
           setStreamingContent(accumulated)
@@ -252,6 +271,7 @@ export default function App() {
         }
       }
     } catch (err: unknown) {
+      if (gen !== generationRef.current) return
       if (err instanceof DOMException && err.name === 'AbortError') return
       setError(err instanceof Error ? err.message : 'Request failed')
       setMessages((prev) => prev.filter((m) => m.id !== 'streaming-placeholder'))
@@ -271,7 +291,7 @@ export default function App() {
   if (authState === 'loading') {
     return (
       <div className="min-h-screen bg-warm-bg flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-mustard border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-blue border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -284,6 +304,28 @@ export default function App() {
     return <SignIn onSignIn={handleAuthComplete} onSwitchToSignup={() => setAuthState('onboarding')} />
   }
 
+  if (authState === 'connection_error') {
+    return (
+      <div className="min-h-screen bg-warm-bg flex items-center justify-center p-4">
+        <div className="text-center max-w-sm">
+          <AlertTriangle size={40} className="text-warm-danger mx-auto mb-4" />
+          <h1 className="text-xl font-semibold text-warm-text mb-2">Cannot connect to server</h1>
+          <p className="text-sm text-warm-muted mb-6">Make sure the backend is running on port 3333.</p>
+          <button
+            onClick={() => { setAuthState('loading'); api.getAuthStatus().then((status: AuthStatus) => {
+              if (!status.has_users) { setAuthState('onboarding') }
+              else if (!status.authenticated) { setAuthState('signin') }
+              else { setAuthState('authenticated') }
+            }).catch(() => setAuthState('connection_error')) }}
+            className="px-4 py-2 bg-blue text-black rounded-lg hover:opacity-90 text-sm font-medium"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex h-screen bg-warm-bg text-warm-text">
       {/* Sidebar */}
@@ -291,7 +333,7 @@ export default function App() {
               <aside className="w-56 bg-warm-surface border-r border-warm-border flex flex-col shrink-0">
                 {/* Branding */}
                 <div className="px-3 py-3 border-b border-warm-border flex items-center gap-2">
-                  <div className="w-7 h-7 bg-mustard rounded-lg flex items-center justify-center shrink-0">
+                  <div className="w-7 h-7 bg-blue rounded-lg flex items-center justify-center shrink-0">
                     <MessageSquare size={14} className="text-black" />
                   </div>
                   <span
@@ -309,7 +351,7 @@ export default function App() {
                 type="text" value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search..."
-                className="w-full bg-warm-bg border border-warm-border rounded-lg pl-8 pr-3 py-1.5 text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-mustard text-xs"
+                className="w-full bg-warm-bg border border-warm-border rounded-lg pl-8 pr-3 py-1.5 text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-blue text-xs"
               />
             </div>
           </div>
@@ -329,7 +371,7 @@ export default function App() {
               <button
                 onClick={() => setActiveFolder(null)}
                 className={`px-2 py-1 rounded text-xs whitespace-nowrap transition-colors ${
-                  activeFolder === null ? 'bg-mustard/20 text-mustard' : 'text-warm-muted hover:text-warm-text'
+                  activeFolder === null ? 'bg-blue/20 text-blue' : 'text-warm-muted hover:text-warm-text'
                 }`}
               >
                 All
@@ -339,7 +381,7 @@ export default function App() {
                   key={f}
                   onClick={() => setActiveFolder(f)}
                   className={`px-2 py-1 rounded text-xs whitespace-nowrap transition-colors ${
-                    activeFolder === f ? 'bg-mustard/20 text-mustard' : 'text-warm-muted hover:text-warm-text'
+                    activeFolder === f ? 'bg-blue/20 text-blue' : 'text-warm-muted hover:text-warm-text'
                   }`}
                 >
                   {f}
@@ -407,7 +449,7 @@ export default function App() {
               Settings
             </button>
             {!apiKey && (
-              <div className="flex items-center gap-2 px-3 py-2 text-xs text-mustard">
+              <div className="flex items-center gap-2 px-3 py-2 text-xs text-blue">
                 <Key size={12} />
                 No API key set
               </div>
@@ -431,7 +473,7 @@ export default function App() {
             messages={messages} isStreaming={isStreaming} streamingContent={streamingContent}
             streamingToolCalls={streamingToolCalls} onSend={handleSendMessage}
             onEditResubmit={handleEditResubmit} onStop={handleStopGeneration}
-            hasApiKey={!!apiKey} error={error} prompts={prompts}
+            hasApiKey={!!apiKey} error={error} prompts={prompts} pendingPrompt={pendingPrompt}
           />
         )}
         {page === 'settings' && (
@@ -444,7 +486,7 @@ export default function App() {
         )}
         {page === 'memories' && <MemoryManager onBack={() => setPage('chat')} />}
         {page === 'prompts' && (
-          <PromptLibrary prompts={prompts} onBack={() => setPage('chat')} onSelect={() => {}} onRefresh={() => api.getPrompts().then(setPrompts)} />
+          <PromptLibrary prompts={prompts} onBack={() => setPage('chat')} onSelect={(p) => { setPendingPrompt(p.content); setPage('chat') }} onRefresh={() => api.getPrompts().then(setPrompts)} />
         )}
       </div>
 
@@ -459,5 +501,13 @@ export default function App() {
         />
       )}
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <ToastProvider>
+      <AppInner />
+    </ToastProvider>
   )
 }

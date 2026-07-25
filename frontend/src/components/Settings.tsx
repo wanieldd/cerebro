@@ -42,7 +42,7 @@ function Section({ id, icon: Icon, title, expanded, onToggle, children }: {
         onClick={() => onToggle(id)}
         className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-warm-elevated/50 transition-colors"
       >
-        <Icon size={18} className="text-mustard shrink-0" />
+        <Icon size={18} className="text-blue shrink-0" />
         <span className="text-sm font-medium text-warm-text flex-1">{title}</span>
         <span className={`text-warm-muted text-xs transition-transform ${expanded ? 'rotate-180' : ''}`}>▼</span>
       </button>
@@ -57,7 +57,7 @@ function Toggle({ value, onChange, label }: { value: boolean; onChange: (v: bool
       <span className="text-sm text-warm-text">{label}</span>
       <button
         onClick={() => onChange(!value)}
-        className={`relative w-10 h-5 rounded-full transition-colors ${value ? 'bg-mustard' : 'bg-warm-border'}`}
+        className={`relative w-10 h-5 rounded-full transition-colors ${value ? 'bg-blue' : 'bg-warm-border'}`}
       >
         <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${value ? 'translate-x-5' : 'translate-x-0.5'}`} />
       </button>
@@ -82,7 +82,8 @@ export default function Settings({ onBack }: SettingsProps) {
   const [testing, setTesting] = useState(false)
   const [models, setModels] = useState<ModelOption[]>([])
   const [modelsLoading, setModelsLoading] = useState(false)
-  const [manualModel, setManualModel] = useState(false)
+  const [manualModelText, setManualModelText] = useState(false)
+  const [manualModelImage, setManualModelImage] = useState(false)
   const [fontSize, setFontSize] = useState('md')
   const [compact, setCompact] = useState(false)
   const [autoTitle, setAutoTitle] = useState(true)
@@ -113,6 +114,22 @@ export default function Settings({ onBack }: SettingsProps) {
       if (s.user) setUser({ username: s.user.username, display_name: s.user.display_name })
     }).catch(() => {})
   }, [])
+
+  // Debounce API key save
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      save(KEYS.API_KEY, apiKey)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [apiKey])
+
+  // Debounce system prompt save
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      save(KEYS.SYSTEM_PROMPT, systemPrompt)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [systemPrompt])
 
   const fetchModels = async (key: string) => {
     setModelsLoading(true)
@@ -199,21 +216,21 @@ export default function Settings({ onBack }: SettingsProps) {
         <Section id="api" icon={Cpu} title="API Connection" {...section('api')}>
           <OptionGroup label="OpenRouter API Key">
             <div className="flex items-center justify-between mb-2">
-              <span className={`flex items-center gap-1.5 text-xs ${keyExists ? 'text-green-500' : 'text-mustard'}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${keyExists ? 'bg-green-500' : 'bg-mustard'}`} />
+              <span className={`flex items-center gap-1.5 text-xs ${keyExists ? 'text-green-500' : 'text-blue'}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${keyExists ? 'bg-green-500' : 'bg-blue'}`} />
                 {keyExists ? 'Connected' : 'Not set'}
               </span>
             </div>
             <input
               type="password" value={apiKey}
-              onChange={(e) => { setApiKey(e.target.value); save(KEYS.API_KEY, e.target.value); setTestResult(null); if (e.target.value) fetchModels(e.target.value); else setModels([]) }}
+              onChange={(e) => { setApiKey(e.target.value); setTestResult(null); if (e.target.value) fetchModels(e.target.value); else setModels([]) }}
               placeholder="sk-or-..."
-              className="w-full bg-warm-bg border border-warm-border rounded-lg px-3 py-2 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-mustard mb-2"
+              className="w-full bg-warm-bg border border-warm-border rounded-lg px-3 py-2 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-blue mb-2"
             />
             <div className="flex items-center gap-2">
               <button
                 onClick={handleTestKey} disabled={testing || !apiKey}
-                className="px-3 py-1.5 bg-mustard text-black rounded-lg hover:opacity-90 transition-all text-sm disabled:opacity-50 font-medium"
+                className="px-3 py-1.5 bg-blue text-black rounded-lg hover:opacity-90 transition-all text-sm disabled:opacity-50 font-medium"
               >
                 {testing ? 'Testing...' : 'Test Connection'}
               </button>
@@ -227,8 +244,8 @@ export default function Settings({ onBack }: SettingsProps) {
         <Section id="model" icon={MessageSquare} title="Default Model" {...section('model')}>
           <OptionGroup label="Model">
             <div className="flex items-center justify-between mb-2">
-              <button onClick={() => setManualModel(!manualModel)} className="text-xs text-mustard hover:text-mustard-light transition-colors">
-                {manualModel ? 'Browse models' : 'Type model ID'}
+              <button onClick={() => setManualModelText(!manualModelText)} className="text-xs text-blue hover:text-blue-light transition-colors">
+                {manualModelText ? 'Browse models' : 'Type model ID'}
               </button>
             </div>
 
@@ -238,8 +255,8 @@ export default function Settings({ onBack }: SettingsProps) {
               <ModelSelector
                 models={models} model={model}
                 onModelSelect={handleModelSelect}
-                onToggleManual={() => setManualModel(!manualModel)}
-                manual={manualModel}
+                onToggleManual={() => setManualModelText(!manualModelText)}
+                manual={manualModelText}
               />
             )}
 
@@ -258,8 +275,8 @@ export default function Settings({ onBack }: SettingsProps) {
             <ModelSelector
               models={models} model={imageModel}
               onModelSelect={handleImageModelSelect}
-              onToggleManual={() => setManualModel(!manualModel)}
-              manual={manualModel}
+              onToggleManual={() => setManualModelImage(!manualModelImage)}
+              manual={manualModelImage}
             />
             <div className="text-[10px] text-warm-muted/60 pt-1">
               Current: <code className="text-warm-muted">{imageModel || '(using text model)'}</code>
@@ -277,7 +294,7 @@ export default function Settings({ onBack }: SettingsProps) {
                   onClick={() => { setFontSize(opt.value); save(KEYS.FONT_SIZE, opt.value) }}
                   className={`flex-1 px-3 py-2 rounded-lg text-xs transition-colors ${
                     fontSize === opt.value
-                      ? 'bg-mustard/15 text-mustard border border-mustard/25'
+                      ? 'bg-blue/15 text-blue border border-blue/25'
                       : 'bg-warm-bg text-warm-muted border border-warm-border hover:border-warm-muted'
                   }`}
                 >
@@ -298,7 +315,7 @@ export default function Settings({ onBack }: SettingsProps) {
                     onClick={() => { setCompact(val); save(KEYS.COMPACT, String(val)) }}
                     className={`flex-1 px-3 py-2 rounded-lg text-xs transition-colors ${
                       compact === val
-                        ? 'bg-mustard/15 text-mustard border border-mustard/25'
+                        ? 'bg-blue/15 text-blue border border-blue/25'
                         : 'bg-warm-bg text-warm-muted border border-warm-border hover:border-warm-muted'
                     }`}
                   >
@@ -324,10 +341,10 @@ export default function Settings({ onBack }: SettingsProps) {
           <OptionGroup label="System Prompt Override">
             <textarea
               value={systemPrompt}
-              onChange={(e) => { setSystemPrompt(e.target.value); save(KEYS.SYSTEM_PROMPT, e.target.value) }}
+              onChange={(e) => { setSystemPrompt(e.target.value) }}
               placeholder="Add custom instructions for the AI..."
               rows={5}
-              className="w-full bg-warm-bg border border-warm-border rounded-lg px-3 py-2 text-sm text-warm-text placeholder-warm-muted resize-none focus:outline-none focus:ring-2 focus:ring-mustard"
+              className="w-full bg-warm-bg border border-warm-border rounded-lg px-3 py-2 text-sm text-warm-text placeholder-warm-muted resize-none focus:outline-none focus:ring-2 focus:ring-blue"
             />
             <p className="text-[10px] text-warm-muted/60">These instructions are added to the system prompt for every conversation.</p>
           </OptionGroup>
@@ -347,13 +364,13 @@ export default function Settings({ onBack }: SettingsProps) {
                 type="password" value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 placeholder="Current password"
-                className="w-full bg-warm-bg border border-warm-border rounded-lg px-3 py-2 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-mustard"
+                className="w-full bg-warm-bg border border-warm-border rounded-lg px-3 py-2 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-blue"
               />
               <input
                 type="password" value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="New password (4+ chars)"
-                className="w-full bg-warm-bg border border-warm-border rounded-lg px-3 py-2 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-mustard"
+                className="w-full bg-warm-bg border border-warm-border rounded-lg px-3 py-2 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-blue"
               />
               {pwError && <div className="text-xs text-warm-danger">{pwError}</div>}
               {pwSuccess && <div className="text-xs text-green-500">Password updated!</div>}

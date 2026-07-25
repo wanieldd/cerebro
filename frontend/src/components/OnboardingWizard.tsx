@@ -104,18 +104,18 @@ export default function OnboardingWizard({ onComplete, onSwitchToSignin }: Onboa
       <div className="w-full max-w-md">
         {/* Steps indicator */}
         <div className="flex items-center justify-center gap-2 mb-8">
-          {[0, 1, 2, 3].map((s) => (
+          {[0, 1, 2, 3, 4].map((s) => (
             <div key={s} className="flex items-center gap-2">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
                 step === s
-                  ? 'bg-mustard text-black'
+                  ? 'bg-blue text-black'
                   : step > s
-                    ? 'bg-mustard/30 text-mustard'
+                    ? 'bg-blue/30 text-blue'
                     : 'bg-warm-surface text-warm-muted border border-warm-border'
               }`}>
                 {step > s ? <Check size={14} /> : s + 1}
               </div>
-              {s < TOTAL_STEPS - 1 && <div className={`w-10 h-0.5 ${step > s ? 'bg-mustard' : 'bg-warm-border'}`} />}
+              {s < TOTAL_STEPS - 1 && <div className={`w-10 h-0.5 ${step > s ? 'bg-blue' : 'bg-warm-border'}`} />}
             </div>
           ))}
         </div>
@@ -124,8 +124,8 @@ export default function OnboardingWizard({ onComplete, onSwitchToSignin }: Onboa
         {step === 0 && (
           <div className="bg-warm-surface border border-warm-border rounded-2xl p-8">
             <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-mustard/15 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Sparkles size={28} className="text-mustard" />
+              <div className="w-16 h-16 bg-blue/15 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Sparkles size={28} className="text-blue" />
               </div>
               <h1 className="text-2xl font-bold text-warm-text" style={{ fontFamily: 'var(--font-serif)' }}>
                 Welcome to Cerebro
@@ -142,7 +142,7 @@ export default function OnboardingWizard({ onComplete, onSwitchToSignin }: Onboa
                   type="text" value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="your-username"
-                  className="w-full bg-warm-bg border border-warm-border rounded-lg px-4 py-2.5 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-mustard"
+                  className="w-full bg-warm-bg border border-warm-border rounded-lg px-4 py-2.5 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-blue"
                 />
               </div>
               <div>
@@ -151,7 +151,7 @@ export default function OnboardingWizard({ onComplete, onSwitchToSignin }: Onboa
                   type="text" value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   placeholder="Your Name"
-                  className="w-full bg-warm-bg border border-warm-border rounded-lg px-4 py-2.5 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-mustard"
+                  className="w-full bg-warm-bg border border-warm-border rounded-lg px-4 py-2.5 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-blue"
                 />
               </div>
               <div>
@@ -161,7 +161,7 @@ export default function OnboardingWizard({ onComplete, onSwitchToSignin }: Onboa
                     type={showPassword ? 'text' : 'password'} value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="At least 4 characters"
-                    className="w-full bg-warm-bg border border-warm-border rounded-lg px-4 py-2.5 pr-10 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-mustard"
+                    className="w-full bg-warm-bg border border-warm-border rounded-lg px-4 py-2.5 pr-10 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-blue"
                   />
                   <button
                     onClick={() => setShowPassword(!showPassword)}
@@ -177,7 +177,7 @@ export default function OnboardingWizard({ onComplete, onSwitchToSignin }: Onboa
                   type="password" value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Repeat your password"
-                  className="w-full bg-warm-bg border border-warm-border rounded-lg px-4 py-2.5 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-mustard"
+                  className="w-full bg-warm-bg border border-warm-border rounded-lg px-4 py-2.5 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-blue"
                 />
               </div>
 
@@ -190,7 +190,7 @@ export default function OnboardingWizard({ onComplete, onSwitchToSignin }: Onboa
               <button
                 onClick={handleCreateAccount}
                 disabled={loading}
-                className="w-full py-2.5 bg-mustard text-black rounded-lg hover:opacity-90 transition-all font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-2.5 bg-blue text-black rounded-lg hover:opacity-90 transition-all font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {loading ? 'Creating account...' : 'Create Account'}
                 {!loading && <ArrowRight size={16} />}
@@ -198,7 +198,7 @@ export default function OnboardingWizard({ onComplete, onSwitchToSignin }: Onboa
 
               <p className="text-center text-xs text-warm-muted pt-3">
                 Already have an account?{' '}
-                <button onClick={onSwitchToSignin} className="text-mustard hover:text-mustard-light underline">
+                <button onClick={onSwitchToSignin} className="text-blue hover:text-blue-light underline">
                   Sign in
                 </button>
               </p>
@@ -210,8 +210,8 @@ export default function OnboardingWizard({ onComplete, onSwitchToSignin }: Onboa
         {step === 1 && (
           <div className="bg-warm-surface border border-warm-border rounded-2xl p-8">
             <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-mustard/15 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Key size={28} className="text-mustard" />
+              <div className="w-16 h-16 bg-blue/15 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Key size={28} className="text-blue" />
               </div>
               <h1 className="text-2xl font-bold text-warm-text" style={{ fontFamily: 'var(--font-serif)' }}>
                 Your API Key
@@ -228,14 +228,14 @@ export default function OnboardingWizard({ onComplete, onSwitchToSignin }: Onboa
                   type="password" value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                   placeholder="sk-or-..."
-                  className="w-full bg-warm-bg border border-warm-border rounded-lg px-4 py-2.5 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-mustard"
+                  className="w-full bg-warm-bg border border-warm-border rounded-lg px-4 py-2.5 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-blue"
                 />
               </div>
 
               <div className="flex gap-3">
                 <button
                   onClick={handleSaveApiKey}
-                  className="flex-1 py-2.5 bg-mustard text-black rounded-lg hover:opacity-90 transition-all font-medium text-sm"
+                  className="flex-1 py-2.5 bg-blue text-black rounded-lg hover:opacity-90 transition-all font-medium text-sm"
                 >
                   Save & Continue
                 </button>
@@ -254,8 +254,8 @@ export default function OnboardingWizard({ onComplete, onSwitchToSignin }: Onboa
         {step === 2 && (
           <div className="bg-warm-surface border border-warm-border rounded-2xl p-8">
             <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-mustard/15 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Cpu size={28} className="text-mustard" />
+              <div className="w-16 h-16 bg-blue/15 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Cpu size={28} className="text-blue" />
               </div>
               <h1 className="text-2xl font-bold text-warm-text" style={{ fontFamily: 'var(--font-serif)' }}>
                 Choose Your Model
@@ -283,13 +283,13 @@ export default function OnboardingWizard({ onComplete, onSwitchToSignin }: Onboa
               ) : (
                 <div className="space-y-2">
                   <p className="text-sm text-warm-muted text-center py-2">
-                    No API key set — type your model ID manually
+                    No API key set -- type your model ID manually
                   </p>
                   <input
                     type="text" value={model}
                     onChange={(e) => handleSelectModel(e.target.value)}
                     placeholder="openrouter/anthropic/claude-sonnet-4"
-                    className="w-full bg-warm-bg border border-warm-border rounded-lg px-4 py-2.5 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-mustard"
+                    className="w-full bg-warm-bg border border-warm-border rounded-lg px-4 py-2.5 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-blue"
                   />
                 </div>
               )}
@@ -297,7 +297,7 @@ export default function OnboardingWizard({ onComplete, onSwitchToSignin }: Onboa
 
             <button
               onClick={handleSaveModel}
-              className="w-full py-2.5 bg-mustard text-black rounded-lg hover:opacity-90 transition-all font-medium text-sm flex items-center justify-center gap-2"
+              className="w-full py-2.5 bg-blue text-black rounded-lg hover:opacity-90 transition-all font-medium text-sm flex items-center justify-center gap-2"
             >
               Continue
               <ArrowRight size={16} />
@@ -309,8 +309,8 @@ export default function OnboardingWizard({ onComplete, onSwitchToSignin }: Onboa
         {step === 3 && (
           <div className="bg-warm-surface border border-warm-border rounded-2xl p-8">
             <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-mustard/15 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Cpu size={28} className="text-mustard" />
+              <div className="w-16 h-16 bg-blue/15 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Cpu size={28} className="text-blue" />
               </div>
               <h1 className="text-2xl font-bold text-warm-text" style={{ fontFamily: 'var(--font-serif)' }}>
                 Image Model
@@ -342,7 +342,7 @@ export default function OnboardingWizard({ onComplete, onSwitchToSignin }: Onboa
                     type="text" value={imageModel}
                     onChange={(e) => handleSelectImageModel(e.target.value)}
                     placeholder="openrouter/black-forest-labs/flux-1.1-pro"
-                    className="w-full bg-warm-bg border border-warm-border rounded-lg px-4 py-2.5 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-mustard"
+                    className="w-full bg-warm-bg border border-warm-border rounded-lg px-4 py-2.5 text-sm text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-blue"
                   />
                 </div>
               )}
@@ -351,7 +351,7 @@ export default function OnboardingWizard({ onComplete, onSwitchToSignin }: Onboa
             <div className="flex gap-3">
               <button
                 onClick={handleSaveImageModel}
-                className="flex-1 py-2.5 bg-mustard text-black rounded-lg hover:opacity-90 transition-all font-medium text-sm"
+                className="flex-1 py-2.5 bg-blue text-black rounded-lg hover:opacity-90 transition-all font-medium text-sm"
               >
                 Continue
               </button>
@@ -380,21 +380,21 @@ export default function OnboardingWizard({ onComplete, onSwitchToSignin }: Onboa
 
             <div className="space-y-3 text-left mb-8">
               <div className="flex items-start gap-3 bg-warm-bg rounded-xl p-3">
-                <MessageSquare size={18} className="text-mustard shrink-0 mt-0.5" />
+                <MessageSquare size={18} className="text-blue shrink-0 mt-0.5" />
                 <div>
                   <div className="text-sm text-warm-text font-medium">Chat with AI</div>
                   <div className="text-xs text-warm-muted">Streaming responses with markdown, tools, and memory</div>
                 </div>
               </div>
               <div className="flex items-start gap-3 bg-warm-bg rounded-xl p-3">
-                <Cpu size={18} className="text-mustard shrink-0 mt-0.5" />
+                <Cpu size={18} className="text-blue shrink-0 mt-0.5" />
                 <div>
                   <div className="text-sm text-warm-text font-medium">Default model: {model}</div>
                   <div className="text-xs text-warm-muted">Change anytime in Settings</div>
                 </div>
               </div>
               <div className="flex items-start gap-3 bg-warm-bg rounded-xl p-3">
-                <SettingsIcon size={18} className="text-mustard shrink-0 mt-0.5" />
+                <SettingsIcon size={18} className="text-blue shrink-0 mt-0.5" />
                 <div>
                   <div className="text-sm text-warm-text font-medium">Customizable</div>
                   <div className="text-xs text-warm-muted">Pick your model, adjust appearance, set custom instructions</div>
@@ -404,7 +404,7 @@ export default function OnboardingWizard({ onComplete, onSwitchToSignin }: Onboa
 
             <button
               onClick={handleFinish}
-              className="w-full py-2.5 bg-mustard text-black rounded-lg hover:opacity-90 transition-all font-medium text-sm flex items-center justify-center gap-2"
+              className="w-full py-2.5 bg-blue text-black rounded-lg hover:opacity-90 transition-all font-medium text-sm flex items-center justify-center gap-2"
             >
               Start chatting
               <ArrowRight size={16} />

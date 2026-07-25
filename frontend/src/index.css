@@ -2,9 +2,9 @@
 
 /* Pale Dark Blue Theme — Tailwind v4 CSS-based config */
 @theme {
-  --color-mustard: #5c8db8;
-  --color-mustard-dark: #3d6a91;
-  --color-mustard-light: #8ab8db;
+  --color-blue: #5c8db8;
+  --color-blue-dark: #3d6a91;
+  --color-blue-light: #8ab8db;
   --color-warm-bg: #151a23;
   --color-warm-surface: #1c2330;
   --color-warm-elevated: #252d3d;
@@ -85,7 +85,7 @@ body {
 }
 
 .markdown-content blockquote {
-  border-left: 3px solid var(--color-mustard-dark);
+  border-left: 3px solid var(--color-blue-dark);
   padding-left: 1em;
   color: var(--color-warm-muted);
   margin: 0.6em 0;
@@ -107,18 +107,18 @@ body {
 .markdown-content h3 { font-size: 1.15rem; }
 
 .markdown-content a {
-  color: var(--color-mustard-light);
+  color: var(--color-blue-light);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .markdown-content a:hover {
-  color: var(--color-mustard);
+  color: var(--color-blue);
 }
 
 .markdown-content code:not(pre code) {
   background: var(--color-warm-code);
-  color: var(--color-mustard-light);
+  color: var(--color-blue-light);
   padding: 0.15em 0.4em;
   border-radius: 4px;
   font-size: 0.85em;
@@ -178,4 +178,12 @@ body {
   font-family: var(--font-sans);
   font-size: 0.95rem;
   line-height: 1.5;
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-up {
+  animation: slide-up 0.2s ease-out;
 }

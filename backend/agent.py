@@ -51,10 +51,10 @@ async def stream_agent(
     if system_prompt:
         # Override default system prompt
         from llm_client import SYSTEM_PROMPT as DEFAULT_PROMPT
-        messages = build_messages(history, memory_context)
+        messages = build_messages(history, memory_context, image_model=image_model, base_url=base_url)
         messages[0]["content"] = system_prompt
     else:
-        messages = build_messages(history, memory_context)
+        messages = build_messages(history, memory_context, image_model=image_model, base_url=base_url)
     tool_defs = get_openai_tool_defs()
 
     # Filter tools based on scope: only expose web_search when explicitly enabled
@@ -100,7 +100,7 @@ async def stream_agent(
         async for event in client.stream_chat(
             messages,
             tools=tool_defs if tool_defs else None,
-            model=model,
+            model=image_model or model,
         ):
             if event["type"] == "token":
                 full_content += event["content"]

@@ -1,0 +1,188 @@
+# BUILD.md — Hermes UI Frontend Components
+
+## DO NOT MODIFY
+
+The following files are already written and should NOT be touched:
+- `src/types.ts`
+- `src/api/client.ts`
+- `src/App.tsx`
+- `src/main.tsx`
+- `src/index.css`
+- `src/vite-env.d.ts`
+- `index.html`
+
+## Files to Create
+
+You need to create exactly 6 component files under `frontend/src/components/`. After creating ALL files, run `npm run build` and fix any TypeScript/build errors.
+
+---
+
+### 1. `frontend/src/components/ChatView.tsx`
+
+**Props:**
+```typescript
+interface ChatViewProps {
+  messages: Message[]
+  isLoading: boolean
+  onSend: (content: string) => Promise<void>
+  hasApiKey: boolean
+}
+```
+
+**Behavior:**
+- Import MessageBubble from './MessageBubble' and ChatInput from './ChatInput'
+- Scrollable message list area that auto-scrolls to bottom on new messages
+- If no messages and not loading, show a centered welcome screen with:
+  - Large "Hermes UI" title in white text
+  - Subtitle "Your AI assistant with tools and memory" in gray-400
+  - If !hasApiKey, show a note "Set your API key in Settings to start chatting"
+- Loading indicator (three dots or spinner) shown at bottom when isLoading
+- Overflow-y-auto on message container, flex-col-reverse or scroll-to-bottom logic
+
+**DO NOT MODIFY** the imports from types — `Message` comes from `../types`.
+
+---
+
+### 2. `frontend/src/components/MessageBubble.tsx`
+
+**Props:**
+```typescript
+interface MessageBubbleProps {
+  message: Message
+}
+```
+
+**Behavior:**
+- Import `react-markdown` for rendering markdown content
+- Import ToolCallDisplay from './ToolCallDisplay'
+- For `role === 'user'`: right-aligned, blue background (`bg-blue-600`), white text, rounded-xl
+- For `role === 'assistant'`: left-aligned, dark background (`bg-gray-800`), rounded-xl
+- For `role === 'tool'`: small monospace block, `bg-gray-900` background, `text-xs`, with "Tool: {tool_name}" label. Collapsible if content is long — show first 200 chars with a "Show more" toggle.
+- If message has `tool_calls` array, render ToolCallDisplay for each BEFORE the assistant content
+- The message content is rendered via react-markdown. Use `remarkGfm` plugin (import from 'remark-gfm') for tables/lists
+- Wrap markdown content in a div with class `.markdown-content`
+- Show a small copy-button on hover (top-right corner) that copies the message content to clipboard
+- Show the timestamp (created_at) in a small gray text below the bubble
+
+**Edge cases:**
+- Empty content string → render nothing for the content, just tool calls if any
+- role === 'user' can have empty tool_calls — ignore it
+
+---
+
+### 3. `frontend/src/components/ChatInput.tsx`
+
+**Props:**
+```typescript
+interface ChatInputProps {
+  onSend: (content: string) => Promise<void>
+  isLoading: boolean
+}
+```
+
+**Behavior:**
+- A textarea that grows with content (start at 1 line, max 8 lines)
+- Send button (use `Send` icon from lucide-react) on the right
+- Send on Enter (but Shift+Enter for newline)
+- Disable send button and textarea when `isLoading` is true
+- Clear the input after sending
+- Placeholder: "Type a message... (Shift+Enter for newline)"
+- Styling: dark border (`border-gray-700`), rounded-xl, bg-gray-900, focus:ring-2 focus:ring-blue-500
+- Bottom bar fixed at bottom of the chat area
+
+---
+
+### 4. `frontend/src/components/ToolCallDisplay.tsx`
+
+**Props:**
+```typescript
+interface ToolCallDisplayProps {
+  toolCalls: ToolCall[]
+}
+```
+
+**Behavior:**
+- ToolCall type comes from `../types`
+- Render each tool call as a small collapsible card
+- Header shows: tool name (bold), a `Terminal` icon from lucide-react, "(click to expand)" text
+- Clicking toggles the arg/result content
+- Args shown as JSON in a monospace pre block with light gray background
+- Color scheme: bg-gray-900 border border-gray-700 rounded-lg text-xs
+- If toolCalls array is empty, render nothing
+
+---
+
+### 5. `frontend/src/components/Settings.tsx`
+
+**Props:**
+```typescript
+interface SettingsProps {
+  onBack: () => void
+}
+```
+
+**Behavior:**
+- Title: "Settings" with a back button (ArrowLeft icon) that calls onBack
+- **API Key section:**
+  - Label: "OpenRouter API Key"
+  - Password input (type="password") showing stars
+  - On mount, populate from localStorage key `hermes_ui_api_key`
+  - On change, save to localStorage
+  - "Test Key" button that calls `validateApiKey` from `../api/client` and shows result (green check or red X)
+- **Model section:**
+  - Label: "Model"
+  - Text input pre-filled with localStorage key `hermes_ui_model` or default "openrouter/openai/gpt-4o-mini"
+  - On change, save to localStorage
+  - Helper text: "Full OpenRouter model ID, e.g. openrouter/anthropic/claude-sonnet-4"
+- Display current key status: if key exists in localStorage, show a green indicator "Key set"; otherwise yellow "No key set"
+- Clean spacing, each section as a card-like div with bg-gray-900 border-gray-700 rounded-xl p-4
+- Responsive: max-w-2xl mx-auto
+
+---
+
+### 6. `frontend/src/components/MemoryManager.tsx`
+
+**Props:**
+```typescript
+interface MemoryManagerProps {
+  onBack: () => void
+}
+```
+
+**Behavior:**
+- Title: "Memories" with ArrowLeft back button
+- On mount, fetch memories from `getMemories()` import from `../api/client`
+- List each memory as a card showing:
+  - Key in bold
+  - Content below
+  - Delete button (Trash2 icon) that calls `deleteMemory(key)` and refreshes
+- "Add Memory" form at the top:
+  - Two inputs: Key (text) and Content (text)
+  - "Save" button that calls `addMemory(key, content)` and refreshes
+- Empty state: "No memories yet. Memories persist across conversations."
+- Cards: bg-gray-900 border border-gray-700 rounded-xl p-3 each
+- Color scheme consistent with rest of app
+
+---
+
+## Styling Rules
+
+- **ALL styling is Tailwind CSS v4** (`@import "tailwindcss"` is already in index.css)
+- Dark theme is default via the `dark` class on `<html>`
+- Background: gray-950 outermost, gray-900 for card-like elements
+- Borders: gray-700 / gray-800
+- Text: gray-100 primary, gray-400 secondary
+- Accent: blue-500 / blue-600 for buttons and user bubbles
+- Use lucide-react icons (already a dependency) — import { IconName } from 'lucide-react'
+- No CSS modules, no styled-components, no inline <style> tags
+- Use `rem` / Tailwind spacing scale consistently
+- All buttons should have hover states and transition-colors
+- No custom fonts beyond the system font stack already in index.css
+
+## Build Verification
+
+After creating ALL 6 files, run:
+```bash
+npm run build
+```
+There must be zero TypeScript errors and zero build errors. If there are errors, fix them.

@@ -1,8 +1,13 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { Terminal, Lightbulb, Code, FileText, Globe, Zap } from 'lucide-react'
 import type { Message, SSEEvent, Prompt, ChatParams } from '../types'
+import type { ModelOption } from '../types'
+import * as api from '../api/client'
 import MessageBubble from './MessageBubble'
 import ChatInput from './ChatInput'
+import ChatModelSelector from './ChatModelSelector'
 
 interface ChatViewProps {
   messages: Message[]
@@ -15,13 +20,34 @@ interface ChatViewProps {
   hasApiKey: boolean
   error: string | null
   prompts: Prompt[]
+  pendingPrompt?: string | null
 }
 
 export default function ChatView({
   messages, isStreaming, streamingContent, streamingToolCalls,
-  onSend, onEditResubmit, onStop, hasApiKey, error, prompts,
+  onSend, onEditResubmit, onStop, hasApiKey, error, prompts, pendingPrompt,
 }: ChatViewProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
+  const isCompact = localStorage.getItem('cerebro_compact') === 'true'
+  const fontSize = localStorage.getItem('cerebro_font_size') || 'md'
+  const fontSizeMap: Record<string, number> = { sm: 14, md: 16, lg: 18 }
+  const currentFontSize = fontSizeMap[fontSize] || 16
+  const msgContainerClass = isCompact ? 'gap-0.5 py-1' : 'gap-1 py-2'
+  const msgPaddingClass = isCompact ? 'px-4 py-3' : 'px-6 py-6'
+  const [models, setModels] = useState<ModelOption[]>([])
+
+  useEffect(() => {
+    const key = localStorage.getItem('hermes_ui_api_key')
+    if (key) {
+      api.getModels(key).then(setModels).catch(() => {})
+    }
+  }, [])
+
+  const handleModelSelect = (id: string) => {
+    localStorage.setItem('hermes_ui_model', id)
+  }
+
+  const currentModel = localStorage.getItem('hermes_ui_model') || ''
 
   useEffect(() => {
     if (bottomRef.current) {
@@ -30,8 +56,8 @@ export default function ChatView({
   }, [messages, streamingContent])
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      <div className="flex-1 overflow-y-auto px-6 py-6">
+    <div className="flex-1 flex flex-col min-h-0" style={{ fontSize: currentFontSize + 'px' }}>
+      <div className={`flex-1 overflow-y-auto ${msgPaddingClass}`}>
         <div className="max-w-3xl mx-auto">
           {messages.length === 0 && !isStreaming && (
             <div className="flex flex-col items-center justify-center min-h-[70vh] text-center px-4">
@@ -45,7 +71,7 @@ export default function ChatView({
                 Your AI assistant with tools and memory
               </p>
               {!hasApiKey ? (
-                <p className="text-mustard text-sm">Set your API key in Settings to start chatting</p>
+                <p className="text-blue text-sm">Set your API key in Settings to start chatting</p>
               ) : (
                 <div className="space-y-4">
                   <p className="text-xs text-warm-muted">Try one of these to get started:</p>
@@ -62,7 +88,7 @@ export default function ChatView({
                         onClick={() => onSend(s.text)}
                         className="flex items-center gap-2 px-4 py-2.5 bg-warm-surface border border-warm-border rounded-xl text-sm text-warm-muted hover:text-warm-text hover:border-warm-muted hover:bg-warm-elevated transition-all text-left"
                       >
-                        <s.icon size={15} className="text-mustard shrink-0" />
+                        <s.icon size={15} className="text-blue shrink-0" />
                         {s.text}
                       </button>
                     ))}
@@ -86,6 +112,11 @@ export default function ChatView({
             </div>
           )}
 
+          <div className="flex items-center mb-2">
+            <ChatModelSelector models={models} currentModel={currentModel} onModelSelect={handleModelSelect} />
+          </div>
+
+          <div className={`flex flex-col ${msgContainerClass}`}>
           {messages.map((msg) => (
             msg.id !== 'streaming-placeholder' ? (
               <MessageBubble
@@ -95,6 +126,7 @@ export default function ChatView({
               />
             ) : null
           ))}
+          </div>
 
           {/* Streaming content — AI style, no bubble */}
           {isStreaming && (
@@ -107,10 +139,10 @@ export default function ChatView({
                       key={tc.id || i}
                       className="bg-warm-elevated border border-warm-border rounded-lg px-3 py-2 text-xs flex items-center gap-2 max-w-md"
                     >
-                      <Terminal size={12} className="text-mustard" />
+                      <Terminal size={12} className="text-blue" />
                       <span className="text-warm-muted font-medium">{tc.name}</span>
                       {!(tc as any).result ? (
-                        <span className="text-mustard ml-auto animate-pulse">running...</span>
+                        <span className="text-blue ml-auto animate-pulse">running...</span>
                       ) : (
                         <span className="text-green-500 ml-auto">done</span>
                       )}
@@ -122,15 +154,15 @@ export default function ChatView({
               {/* Streaming text — serif, no bubble, with blinking cursor */}
               {streamingContent && (
                 <div className="markdown-content" style={{ maxWidth: '65ch' }}>
-                  {streamingContent}
-                  <span className="inline-block w-[2px] h-[1em] bg-mustard ml-0.5 animate-pulse align-middle" />
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContent}</ReactMarkdown>
+                  <span className="inline-block w-[2px] h-[1em] bg-blue ml-0.5 animate-pulse align-middle" />
                 </div>
               )}
 
               {/* Thinking indicator */}
               {!streamingContent && streamingToolCalls.length === 0 && (
                 <div className="flex items-center gap-2 py-2 text-warm-muted text-sm" style={{ fontFamily: 'var(--font-serif)' }}>
-                  <span className="w-2 h-2 rounded-full bg-mustard animate-pulse" />
+                  <span className="w-2 h-2 rounded-full bg-blue animate-pulse" />
                   Thinking...
                 </div>
               )}
@@ -148,7 +180,7 @@ export default function ChatView({
         </div>
       </div>
 
-      <ChatInput onSend={onSend} onStop={onStop} isLoading={isStreaming} />
+      <ChatInput onSend={onSend} onStop={onStop} isLoading={isStreaming} pendingPrompt={pendingPrompt} />
     </div>
   )
 }

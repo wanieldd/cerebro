@@ -61,7 +61,7 @@ export default function PromptLibrary({ prompts, onBack, onSelect, onRefresh }: 
           </button>
           <button
             onClick={() => setShowNew(!showNew)}
-            className="flex items-center gap-1 px-3 py-1.5 bg-mustard text-black rounded-lg hover:opacity-90 transition-colors text-sm"
+            className="flex items-center gap-1 px-3 py-1.5 bg-blue text-black rounded-lg hover:opacity-90 transition-colors text-sm"
           >
             <Plus size={16} />
             New
@@ -76,17 +76,17 @@ export default function PromptLibrary({ prompts, onBack, onSelect, onRefresh }: 
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
               placeholder="Prompt title"
-              className="w-full bg-warm-bg border border-warm-border rounded-lg px-3 py-2 text-warm-text placeholder-warm-muted text-sm focus:outline-none focus:ring-2 focus:ring-mustard"
+              className="w-full bg-warm-bg border border-warm-border rounded-lg px-3 py-2 text-warm-text placeholder-warm-muted text-sm focus:outline-none focus:ring-2 focus:ring-blue"
             />
             <textarea
               value={newContent}
               onChange={(e) => setNewContent(e.target.value)}
               placeholder="Prompt content"
               rows={3}
-              className="w-full bg-warm-bg border border-warm-border rounded-lg px-3 py-2 text-warm-text placeholder-warm-muted text-sm resize-none focus:outline-none focus:ring-2 focus:ring-mustard"
+              className="w-full bg-warm-bg border border-warm-border rounded-lg px-3 py-2 text-warm-text placeholder-warm-muted text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue"
             />
             <div className="flex gap-2">
-              <button onClick={handleCreate} className="px-3 py-1.5 bg-mustard text-black rounded-lg hover:opacity-90 text-sm transition-colors">
+              <button onClick={handleCreate} className="px-3 py-1.5 bg-blue text-black rounded-lg hover:opacity-90 text-sm transition-colors">
                 Save
               </button>
               <button onClick={() => { setShowNew(false); setNewTitle(''); setNewContent('') }} className="px-3 py-1.5 bg-warm-elevated text-warm-text rounded-lg hover:bg-warm-elevated text-sm transition-colors">
@@ -110,16 +110,16 @@ export default function PromptLibrary({ prompts, onBack, onSelect, onRefresh }: 
                     type="text"
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
-                    className="w-full bg-warm-bg border border-warm-border rounded-lg px-3 py-2 text-sm text-warm-text focus:outline-none focus:ring-2 focus:ring-mustard"
+                    className="w-full bg-warm-bg border border-warm-border rounded-lg px-3 py-2 text-sm text-warm-text focus:outline-none focus:ring-2 focus:ring-blue"
                   />
                   <textarea
                     value={editContent}
                     onChange={(e) => setEditContent(e.target.value)}
                     rows={3}
-                    className="w-full bg-warm-bg border border-warm-border rounded-lg px-3 py-2 text-sm text-warm-text resize-none focus:outline-none focus:ring-2 focus:ring-mustard"
+                    className="w-full bg-warm-bg border border-warm-border rounded-lg px-3 py-2 text-sm text-warm-text resize-none focus:outline-none focus:ring-2 focus:ring-blue"
                   />
                   <div className="flex gap-2">
-                    <button onClick={() => handleUpdate(p.id)} className="px-3 py-1 bg-mustard text-black rounded text-xs hover:opacity-90">Save</button>
+                    <button onClick={() => handleUpdate(p.id)} className="px-3 py-1 bg-blue text-black rounded text-xs hover:opacity-90">Save</button>
                     <button onClick={() => setEditingId(null)} className="px-3 py-1 bg-warm-elevated text-warm-text rounded text-xs hover:bg-warm-elevated">Cancel</button>
                   </div>
                 </div>
@@ -133,7 +133,7 @@ export default function PromptLibrary({ prompts, onBack, onSelect, onRefresh }: 
                     <div className="text-warm-muted text-xs mt-1 line-clamp-2">{p.content}</div>
                   </button>
                   <div className="flex justify-end gap-1 px-4 pb-2">
-                    <button onClick={() => startEdit(p)} className="text-warm-muted hover:text-mustard p-1">
+                    <button onClick={() => startEdit(p)} className="text-warm-muted hover:text-blue p-1">
                       <Pencil size={12} />
                     </button>
                     <button onClick={() => handleDelete(p.id)} className="text-warm-muted hover:text-warm-danger p-1">
