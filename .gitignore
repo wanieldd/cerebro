@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+*.egg
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Database
+backend/data/*.db
+*.db-journal
+*.db-wal
+
+# Uploads
+backend/data/uploads/*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Hermes
+.hermes/
+
+# Temp
+/tmp/
+*.log
