@@ -8,7 +8,7 @@ from pathlib import Path
 import httpx
 from fastapi import FastAPI, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
 import database as db
@@ -21,6 +21,9 @@ from llm_client import LLMClient, OPENROUTER_BASE
 async def lifespan(app: FastAPI):
     await db.init_db()
     os.makedirs(str(UPLOAD_DIR), exist_ok=True)
+    from cron import start_scheduler, load_tasks
+    start_scheduler()
+    await load_tasks()
     yield
 
 
@@ -70,6 +73,25 @@ class UpdatePromptRequest(BaseModel):
 class UpdateFolderRequest(BaseModel):
     folder: str
 
+class CreateProjectRequest(BaseModel):
+    name: str
+    description: str | None = None
+    context: str | None = None
+
+class UpdateProjectRequest(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    context: str | None = None
+
+class CreateDocumentRequest(BaseModel):
+    project_id: str | None = None
+    title: str | None = None
+    content: str | None = None
+
+class UpdateDocumentRequest(BaseModel):
+    title: str | None = None
+    content: str | None = None
+
 class SearchRequest(BaseModel):
     q: str
 
@@ -85,6 +107,23 @@ class SigninRequest(BaseModel):
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
+
+class ResearchRequest(BaseModel):
+    query: str
+    depth: str | None = "quick"
+
+class CreateTaskRequest(BaseModel):
+    name: str
+    prompt: str
+    schedule: str
+    model: str | None = None
+
+class UpdateTaskRequest(BaseModel):
+    name: str | None = None
+    prompt: str | None = None
+    schedule: str | None = None
+    model: str | None = None
+    enabled: bool | None = None
 
 
 # ── Helper ──
@@ -201,6 +240,159 @@ async def chat_resubmit(conversation_id: str, body: EditMessageRequest, request:
     )
 
 
+@app.post("/api/chat/{conversation_id}/regenerate")
+async def chat_regenerate(conversation_id: str, request: Request):
+    """Regenerate the last assistant response without editing the user message."""
+    api_key = get_api_key(request)
+    model = request.headers.get("x-model")
+    image_model = request.headers.get("x-image-model") or request.headers.get("X-Image-Model")
+
+    forwarded = request.headers.get("x-forwarded-proto", "http")
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host", "localhost:3333")
+    base_url = f"{forwarded}://{host}"
+
+    conv = await db.get_conversation(conversation_id)
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    msgs = await db.get_messages(conversation_id)
+    if not msgs:
+        raise HTTPException(status_code=400, detail="No messages to regenerate from")
+
+    # Find last user message
+    last_user = None
+    for m in reversed(msgs):
+        if m["role"] == "user":
+            last_user = m
+            break
+
+    if not last_user:
+        raise HTTPException(status_code=400, detail="No user message to regenerate from")
+
+    # Delete all messages after the last user message
+    await db.delete_messages_after(conversation_id, last_user["id"])
+
+    async def event_stream():
+        async for event in stream_agent(
+            conversation_id,
+            last_user["content"],
+            api_key,
+            model=model,
+            image_model=image_model,
+            base_url=base_url,
+        ):
+            yield json.dumps(event) + "\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+# ── Conversation Export ──
+
+@app.get("/api/conversations/{conversation_id}/export")
+async def export_conversation(conversation_id: str, fmt: str = "json"):
+    """Export a conversation as JSON or Markdown."""
+    data = await db.get_conversation_with_messages(conversation_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    conv = data["conversation"]
+    messages = data["messages"]
+
+    if fmt == "md":
+        lines = [f"# {conv['title']}", f"", f"*Exported: {conv['updated_at']}*", f"", "---", ""]
+        for m in messages:
+            role_label = "**You**" if m["role"] == "user" else "**Assistant**" if m["role"] == "assistant" else f"**{m['role']}**"
+            lines.append(f"### {role_label}")
+            lines.append("")
+            if m["content"]:
+                lines.append(m["content"])
+                lines.append("")
+            if m.get("tool_calls"):
+                for tc in m["tool_calls"]:
+                    fname = tc.get("function", {}).get("name", "unknown")
+                    lines.append(f"> _Tool call: {fname}_")
+                    lines.append("")
+        content = "\n".join(lines)
+        return Response(content=content, media_type="text/markdown",
+                        headers={"Content-Disposition": f'attachment; filename="{conv["title"]}.md"'})
+    else:
+        return JSONResponse(content=data)
+
+
+# ── Prompt Presets ──
+
+@app.get("/api/prompt-presets")
+async def list_prompt_presets():
+    return await db.get_prompt_presets()
+
+class CreatePromptPresetRequest(BaseModel):
+    name: str
+    content: str = ""
+
+class UpdatePromptPresetRequest(BaseModel):
+    name: str
+    content: str = ""
+
+@app.post("/api/prompt-presets")
+async def new_prompt_preset(body: CreatePromptPresetRequest):
+    if not body.name.strip():
+        raise HTTPException(status_code=400, detail="Name is required")
+    return await db.create_prompt_preset(body.name.strip(), body.content)
+
+@app.put("/api/prompt-presets/{pid}")
+async def update_prompt_preset(pid: str, body: UpdatePromptPresetRequest):
+    ok = await db.update_prompt_preset(pid, body.name.strip(), body.content)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Prompt preset not found")
+    return {"updated": True}
+
+@app.delete("/api/prompt-presets/{pid}")
+async def delete_prompt_preset(pid: str):
+    ok = await db.delete_prompt_preset(pid)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Prompt preset not found")
+    return {"deleted": True}
+
+
+# ── Token Count (approximate) ──
+
+@app.get("/api/conversations/{conversation_id}/tokens")
+async def count_conversation_tokens(conversation_id: str):
+    """Rough token estimate (len/4) for context indicator."""
+    messages = await db.get_messages(conversation_id)
+    total_chars = sum(len(m.get("content", "")) for m in messages)
+    # Rough estimate: ~4 chars per token
+    total_tokens = total_chars // 4
+    # Count per role
+    by_role = {"user": 0, "assistant": 0, "tool": 0, "system": 0}
+    for m in messages:
+        by_role[m["role"]] += len(m.get("content", "")) // 4
+    return {"total_tokens": total_tokens, "message_count": len(messages), "by_role": by_role}
+
+@app.post("/api/research")
+async def run_research(body: ResearchRequest, request: Request):
+    api_key = get_api_key(request)
+    model = request.headers.get("x-model")
+
+    if not body.query.strip():
+        raise HTTPException(status_code=400, detail="Research query is required")
+
+    async def event_stream():
+        from research_agent import run_research as do_research
+        async for event in do_research(body.query, api_key, model=model, depth=body.depth or "quick"):
+            yield json.dumps(event) + "\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 # ── Conversations ──
 
 @app.get("/api/conversations")
@@ -260,6 +452,77 @@ async def list_folders():
 @app.get("/api/folders/{folder}")
 async def get_folder(folder: str):
     return await db.get_conversations_by_folder(folder)
+
+
+# ── Projects ──
+
+@app.get("/api/projects")
+async def list_projects():
+    return await db.get_projects()
+
+@app.post("/api/projects")
+async def new_project(body: CreateProjectRequest):
+    if not body.name.strip():
+        raise HTTPException(status_code=400, detail="Project name is required")
+    return await db.create_project(body.name.strip(), (body.description or "").strip(), (body.context or "").strip())
+
+@app.get("/api/projects/{project_id}")
+async def get_project(project_id: str):
+    project = await db.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    convs = await db.get_conversations_by_project(project_id)
+    return {"project": project, "conversations": convs}
+
+@app.patch("/api/projects/{project_id}")
+async def update_project(project_id: str, body: UpdateProjectRequest):
+    ok = await db.update_project(project_id, name=body.name, description=body.description, context=body.context)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return await db.get_project(project_id)
+
+@app.delete("/api/projects/{project_id}")
+async def remove_project(project_id: str):
+    ok = await db.delete_project(project_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return {"deleted": True}
+
+
+# ── Documents ──
+
+@app.get("/api/documents")
+async def list_documents(project_id: str = ""):
+    return await db.get_documents(project_id)
+
+@app.post("/api/documents")
+async def new_document(body: CreateDocumentRequest):
+    return await db.create_document(
+        body.project_id or "",
+        body.title or "Untitled",
+        body.content or "",
+    )
+
+@app.get("/api/documents/{doc_id}")
+async def get_document(doc_id: str):
+    doc = await db.get_document(doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return doc
+
+@app.put("/api/documents/{doc_id}")
+async def update_document(doc_id: str, body: UpdateDocumentRequest):
+    ok = await db.update_document(doc_id, title=body.title, content=body.content)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return await db.get_document(doc_id)
+
+@app.delete("/api/documents/{doc_id}")
+async def remove_document(doc_id: str):
+    ok = await db.delete_document(doc_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return {"deleted": True}
 
 
 # ── Messages ──
@@ -350,6 +613,40 @@ async def delete_prompt(pid: str):
     if not ok:
         raise HTTPException(status_code=404, detail="Prompt not found")
     return {"deleted": True}
+
+
+# ── Scheduled Tasks ──
+
+@app.get("/api/scheduled-tasks")
+async def list_tasks():
+    return await db.get_all_scheduled_tasks()
+
+@app.post("/api/scheduled-tasks")
+async def new_task(body: CreateTaskRequest):
+    if not body.name.strip() or not body.prompt.strip() or not body.schedule.strip():
+        raise HTTPException(status_code=400, detail="name, prompt, and schedule are required")
+    task = await db.create_scheduled_task(body.name.strip(), body.prompt.strip(), body.schedule.strip(), body.model or "")
+    from cron import schedule_task
+    schedule_task(task)
+    return task
+
+@app.delete("/api/scheduled-tasks/{task_id}")
+async def remove_task(task_id: str):
+    ok = await db.delete_scheduled_task(task_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Task not found")
+    from cron import remove_scheduled_task
+    remove_scheduled_task(task_id)
+    return {"deleted": True}
+
+@app.post("/api/scheduled-tasks/{task_id}/run")
+async def run_task_now(task_id: str):
+    task = await db.get_scheduled_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    from cron import execute_scheduled_task
+    await execute_scheduled_task(task_id)
+    return {"ran": True}
 
 
 # ── Auth routes ──
@@ -449,6 +746,15 @@ async def upload_file(file: UploadFile):
         "is_text": is_text,
         "ext": ext,
     }
+
+
+# ── Version ──
+
+VERSION = "1.0.0"
+
+@app.get("/api/version")
+async def get_version():
+    return {"version": VERSION, "name": "Cerebro", "repo": "https://github.com/wanieldd/cerebro"}
 
 
 # ── Static Files ──

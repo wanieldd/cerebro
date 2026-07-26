@@ -19,11 +19,11 @@ export default function ConfirmDialog({
 }: ConfirmDialogProps) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in"
       onClick={onCancel}
     >
       <div
-        className="bg-warm-surface border border-warm-border rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl"
+        className="bg-warm-surface border border-warm-border rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl animate-message-in"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between mb-3">

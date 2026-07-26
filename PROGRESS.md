@@ -1,6 +1,6 @@
 # Cerebro -- AI Chat App Progress Tracker
 
-> **Last updated:** 2026-07-25  
+> **Last updated:** 2026-07-26  
 > **App name:** Cerebro  
 > **Tech stack:** React 19 + TypeScript + Vite 6 + FastAPI + Tailwind CSS 4  
 > **Auth / API:** OpenRouter (bring-your-own-key)  
@@ -179,10 +179,28 @@ User → React App → FastAPI → OpenRouter
 - [x] **Toast/notification system added:** Toast.tsx with ToastProvider wired into App
 - [x] **Vision model wired:** multimodal content construction in `llm_client.py` when image_model is set
 - [x] **Session token expiry:** 30-day TTL on sessions, expired sessions auto-rejected
+- [x] **Syntax highlighting for code blocks:** react-syntax-highlighter (Prism + OneDark) with copy button, language label
+- [x] **Regenerate response:** Button on last assistant message, calls new `/chat/{id}/regenerate` endpoint
+- [x] **Conversation rename (inline):** Double-click title in sidebar to edit inline, persists via PATCH
+- [x] **Search inside conversation:** Search bar in top bar, filters messages by text with match count
+- [x] **Scroll-to-bottom button:** Floating button when scrolled up in chat
+- [x] **Drag & drop files:** onDragOver/onDrop with overlay, supports images + files
+- [x] **Conversation export:** Download as JSON or Markdown via `/conversations/{id}/export`
+- [x] **Context/token indicator:** Approximate token count (len/4) and message count near model selector
+- [x] **System prompt presets:** Save/load/delete named presets via new `prompt_presets` table and Settings UI
+- [x] **Mobile responsive:** Sidebar as slide-in drawer with hamburger, backdrop overlay
+- [x] **Auto-update:** `install.sh` one-command installer + `cerebro-update` script (git pull + rebuild)
+- [x] **Version endpoint:** `GET /api/version` returns version, name, repo URL
+- [x] **Docker support:** `Dockerfile` for containerized deployment
+- [x] **Website:** Public landing page at `website/index.html` with features, install, links
+- [x] **README overhaul:** Install instructions, Docker, tests, usage, project structure
 
 ### ❌ Not Yet Done
-- [ ] Mobile responsive
 - [ ] Keyboard shortcuts (Cmd+K model, Ctrl+Enter send)
+- [ ] Voice input / TTS
+- [ ] Conversation branching
+- [ ] PWA support (manifest + service worker)
+- [ ] Usage/cost tracking per conversation
 
 ---
 
@@ -216,6 +234,20 @@ User → React App → FastAPI → OpenRouter
 ---
 
 ## Recent Changes
+
+### 2026-07-26 -- Feature batch: syntax highlighting, regenerate, search inside chat, export, drag-drop, presets
+- **Backend:** new `POST /chat/{id}/regenerate` endpoint, `GET /conversations/{id}/export` (JSON/MD), `GET /conversations/{id}/tokens` (rough count), `prompt_presets` table + full CRUD
+- **Syntax highlighting:** MessageBubble uses react-syntax-highlighter (Prism + OneDark theme) with language label, copy button; inline code stays unchanged
+- **Regenerate:** Button on last assistant message strips assistant responses and re-streams from last user message
+- **Search inside conversation:** Toggle search bar in top bar, live-filter messages by text, shows match count
+- **Scroll-to-bottom:** Floating arrow button appears when scrolled up past 150px threshold
+- **Drag & drop:** ChatInput handles drag-over with dashed overlay, drops images as blob previews, files as uploads
+- **Conversation export:** Download as JSON or Markdown from buttons in top bar
+- **Context indicator:** Token estimate (~len/4) and message count shown next to model selector
+- **Conversation rename:** Double-click conversation title in sidebar → inline text input → Enter/blur saves via PATCH
+- **System prompt presets:** Save current system prompt with name, load/delete presets from Settings > Custom Instructions
+- **Verification:** `npm run build` passes zero errors
+- **PROGRESS.md:** Full backlog added, all new features marked done, remaining items updated
 
 ### 2026-07-25 -- Bugfix marathon: all 15 known issues resolved
 - **Files:** `index.css`, `App.tsx`, `ChatView.tsx`, `ChatInput.tsx`, `Settings.tsx`, `OnboardingWizard.tsx`, `Toast.tsx` (new), `PromptLibrary.tsx`, `agent.py`, `database.py`, `llm_client.py`, `PROGRESS.md`, `BUILD.md`, `BUILD-backend.md`, `.hermes/plans/bugfix-plan.md`
@@ -338,24 +370,39 @@ cd /opt/data/cerebro/backend && uv run uvicorn main:app --host 0.0.0.0 --port 80
 
 ---
 
-## Next Steps
+## Next Steps / Backlog
 
-### High Priority
-1. Wire vision model for actual image reading (multimodal content in `llm_client.py`)
-2. Wire compact mode layout changes
-3. Wire font size setting
-4. Fix prompt library `onSelect` so clicking a prompt inserts into chat
-5. Fix onboarding progress dots (5 steps, 5 dots)
-6. Debounce API key and system prompt saves
-7. Fix `manualModel` state isolation between Default Model and Image Model sections
+### ✅ Completed (from previous backlog)
+- Wire vision model for image reading
+- Wire compact mode / font size settings
+- Fix prompt library `onSelect`
+- Fix onboarding progress dots
+- Debounce API key / system prompt saves
+- Fix `manualModel` state isolation
+- Fix resubmit race condition
+- Add session token expiry (30-day TTL)
+- Rename CSS variables from mustard to blue
+- Toast notification system
+- Auth bypass-on-error → connection error UI
 
-### Medium Priority
-8. Mobile responsive polish
-9. Fix resubmit race condition
-10. Add session token expiry
-11. Rename CSS variables from `--color-mustard` to `--color-blue`
+### 🟢 High Priority (core UX)
+1. ~~**Syntax highlighting for code blocks**~~ — ✅ Done
+2. ~~**Regenerate response**~~ — ✅ Done
+3. ~~**Conversation rename (inline)**~~ — ✅ Done
+4. ~~**Search inside a conversation**~~ — ✅ Done
+5. ~~**Drag & drop files**~~ — ✅ Done
+6. ~~**Scroll-to-bottom button**~~ — ✅ Done
+7. ~~**Conversation export**~~ — ✅ Done
 
-### Low Priority
-12. Add toast/notification system
-13. Add keyboard shortcuts (Cmd+K model, Ctrl+Enter send)
-14. Review auth bypass-on-error approach
+### 🟡 Medium Priority
+8. ~~**Context/token usage indicator**~~ — ✅ Done
+9. **Mid-conversation model switching** — Pass selected model with each message so you can swap mid-chat
+10. ~~**System prompt presets**~~ — ✅ Done
+11. **Mobile responsive polish** — Sidebar drawer, input sizing on small screens
+12. **Keyboard shortcuts** — Cmd+K open model search, Ctrl+Enter send alternative
+
+### 🔵 Lower Priority
+13. **Voice input / TTS** — Microphone button + speech-to-text, read-aloud
+14. **Conversation branching** — Fork at any message
+15. **PWA support** — manifest.json + service worker
+16. **Usage/cost tracking** — Token usage per conversation/model

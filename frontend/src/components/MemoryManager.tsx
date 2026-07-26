@@ -136,7 +136,7 @@ export default function MemoryManager({ onBack }: MemoryManagerProps) {
           </button>
         </div>
 
-        {/* Example memories — only show if no memories exist yet */}
+        {/* Example memories -- only show if no memories exist yet */}
         {!loading && memories.length === 0 && (
           <div className="bg-warm-surface border border-warm-border rounded-xl p-4">
             <div className="text-sm text-warm-text font-medium flex items-center gap-2 mb-3">

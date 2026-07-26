@@ -76,3 +76,27 @@ export interface ChatParams {
   auto_memory?: boolean
   system_prompt?: string
 }
+
+export interface Project {
+  id: string
+  name: string
+  description: string
+  context: string
+  conv_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ProjectDetail {
+  project: Project
+  conversations: Conversation[]
+}
+
+export interface Document {
+  id: string
+  project_id: string
+  title: string
+  content: string
+  created_at: string
+  updated_at: string
+}

@@ -1,4 +1,4 @@
-import type { Conversation, ConversationDetail, Memory, SSEEvent, Prompt, ModelOption, UploadResult, ChatParams } from '../types'
+import type { Conversation, ConversationDetail, Memory, SSEEvent, Prompt, ModelOption, UploadResult, ChatParams, Project, ProjectDetail, Document } from '../types'
 
 const BASE = '/api'
 
@@ -185,6 +185,106 @@ export function editMessage(messageId: string, content: string): Promise<{ updat
   })
 }
 
+// ── Regenerate ──
+
+export async function* streamRegenerate(
+  conversationId: string,
+  apiKey: string,
+  model?: string,
+  signal?: AbortSignal,
+): AsyncGenerator<SSEEvent> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Api-Key': apiKey,
+  }
+  if (model) headers['X-Model'] = model
+  const imageM = localStorage.getItem('cerebro_image_model')
+  if (imageM) headers['X-Image-Model'] = imageM
+
+  const res = await fetch(`${BASE}/chat/${conversationId}/regenerate`, {
+    method: 'POST',
+    headers,
+    signal,
+  })
+
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(err || `HTTP ${res.status}`)
+  }
+
+  const reader = res.body?.getReader()
+  if (!reader) throw new Error('Response body not readable')
+
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() || ''
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed) continue
+      try {
+        const event: SSEEvent = JSON.parse(trimmed)
+        yield event
+      } catch { /* skip */ }
+    }
+  }
+}
+
+// ── Conversation Export ──
+
+export async function exportConversation(conversationId: string, fmt: 'json' | 'md'): Promise<string> {
+  const token = getSessionToken()
+  const headers: Record<string, string> = {}
+  if (token) headers['X-Session-Token'] = token
+  const res = await fetch(`${BASE}/conversations/${conversationId}/export?fmt=${fmt}`, { headers })
+  if (!res.ok) throw new Error(`Export failed: HTTP ${res.status}`)
+  const blob = await res.blob()
+  return URL.createObjectURL(blob)
+}
+
+// ── Token Count ──
+
+export function getConversationTokens(conversationId: string): Promise<{ total_tokens: number; message_count: number; by_role: Record<string, number> }> {
+  return fetchApi(`/conversations/${conversationId}/tokens`)
+}
+
+// ── Prompt Presets ──
+
+export type PromptPreset = {
+  id: string
+  name: string
+  content: string
+  created_at: string
+  updated_at: string
+}
+
+export function getPromptPresets(): Promise<PromptPreset[]> {
+  return fetchApi('/prompt-presets')
+}
+
+export function createPromptPreset(name: string, content: string): Promise<PromptPreset> {
+  return fetchApi('/prompt-presets', {
+    method: 'POST',
+    body: JSON.stringify({ name, content }),
+  })
+}
+
+export function updatePromptPreset(id: string, name: string, content: string): Promise<{ updated: boolean }> {
+  return fetchApi(`/prompt-presets/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ name, content }),
+  })
+}
+
+export function deletePromptPreset(id: string): Promise<{ deleted: boolean }> {
+  return fetchApi(`/prompt-presets/${id}`, { method: 'DELETE' })
+}
+
 // ── Models ──
 
 export function getModels(apiKey: string): Promise<ModelOption[]> {
@@ -281,6 +381,63 @@ export function setSessionToken(token: string): void {
 
 export function clearSessionToken(): void {
   localStorage.removeItem(SESSION_KEY)
+}
+
+// ── Projects ──
+
+export function getProjects(): Promise<Project[]> {
+  return fetchApi('/projects')
+}
+
+export function createProject(name: string, description?: string, context?: string): Promise<Project> {
+  return fetchApi('/projects', {
+    method: 'POST',
+    body: JSON.stringify({ name, description: description || '', context: context || '' }),
+  })
+}
+
+export function getProject(id: string): Promise<ProjectDetail> {
+  return fetchApi(`/projects/${id}`)
+}
+
+export function updateProject(id: string, data: { name?: string; description?: string; context?: string }): Promise<Project> {
+  return fetchApi(`/projects/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export function deleteProject(id: string): Promise<{ deleted: boolean }> {
+  return fetchApi(`/projects/${id}`, { method: 'DELETE' })
+}
+
+// ── Documents ──
+
+export function getDocuments(projectId?: string): Promise<Document[]> {
+  const q = projectId ? `?project_id=${encodeURIComponent(projectId)}` : ''
+  return fetchApi(`/documents${q}`)
+}
+
+export function createDocument(projectId?: string, title?: string, content?: string): Promise<Document> {
+  return fetchApi('/documents', {
+    method: 'POST',
+    body: JSON.stringify({ project_id: projectId || '', title: title || 'Untitled', content: content || '' }),
+  })
+}
+
+export function getDocument(id: string): Promise<Document> {
+  return fetchApi(`/documents/${id}`)
+}
+
+export function saveDocument(id: string, data: { title?: string; content?: string }): Promise<Document> {
+  return fetchApi(`/documents/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export function deleteDocument(id: string): Promise<{ deleted: boolean }> {
+  return fetchApi(`/documents/${id}`, { method: 'DELETE' })
 }
 
 async function authFetch<T>(path: string, options?: RequestInit): Promise<T> {

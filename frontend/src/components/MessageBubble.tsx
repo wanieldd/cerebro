@@ -1,16 +1,64 @@
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Copy, Check, Pencil, X, Send } from 'lucide-react'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { Copy, Check, Pencil, X, Send, RefreshCw } from 'lucide-react'
 import type { Message } from '../types'
 import ToolCallDisplay from './ToolCallDisplay'
 
 interface MessageBubbleProps {
   message: Message
   onEdit?: (messageId: string, newContent: string) => Promise<void>
+  onRegenerate?: () => void
+  isLastAssistant?: boolean
 }
 
-export default function MessageBubble({ message, onEdit }: MessageBubbleProps) {
+// Custom code block component with syntax highlighting
+function CodeBlock({ className, children }: { className?: string; children?: React.ReactNode }) {
+  const [copied, setCopied] = useState(false)
+  const match = /language-(\w+)/.exec(className || '')
+  const language = match ? match[1] : ''
+  const code = String(children).replace(/\n$/, '')
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(code)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="relative group">
+      <div className="flex items-center justify-between px-4 py-1.5 bg-[#2d323b] border-b border-[#3d434f] rounded-t-lg">
+        <span className="text-xs text-warm-muted font-mono">{language || 'code'}</span>
+        <button
+          onClick={handleCopy}
+          className="text-warm-muted hover:text-warm-text p-1 transition-colors"
+          title="Copy code"
+        >
+          {copied ? <Check size={12} /> : <Copy size={12} />}
+        </button>
+      </div>
+      <SyntaxHighlighter
+        style={oneDark}
+        language={language || 'text'}
+        PreTag="div"
+        customStyle={{
+          margin: 0,
+          borderTopLeftRadius: 0,
+          borderTopRightRadius: 0,
+          borderBottomLeftRadius: '8px',
+          borderBottomRightRadius: '8px',
+          fontSize: '0.8rem',
+        }}
+      >
+        {code}
+      </SyntaxHighlighter>
+    </div>
+  )
+}
+
+export default function MessageBubble({ message, onEdit, onRegenerate, isLastAssistant }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -36,6 +84,21 @@ export default function MessageBubble({ message, onEdit }: MessageBubbleProps) {
     setEditing(false)
   }
 
+  const markdownComponents = {
+    code({ className, children, ...props }: { className?: string; children?: React.ReactNode }) {
+      const match = /language-(\w+)/.exec(className || '')
+      if (match) {
+        return <CodeBlock className={className}>{children}</CodeBlock>
+      }
+      // Inline code
+      return (
+        <code className={className} {...props}>
+          {children}
+        </code>
+      )
+    },
+  }
+
   // Tool message rendering (collapsible monospace block)
   if (message.role === 'tool') {
     const content = message.content || ''
@@ -43,7 +106,7 @@ export default function MessageBubble({ message, onEdit }: MessageBubbleProps) {
     const displayed = isLong && !expanded ? content.slice(0, 200) + '...' : content
 
     return (
-      <div className="flex justify-start py-1">
+      <div className="flex justify-start py-1 animate-fade-in">
         <div className="bg-warm-elevated border border-warm-border rounded-lg px-3 py-2 max-w-full text-xs font-mono" style={{ fontFamily: 'var(--font-mono)' }}>
           <div className="text-warm-muted mb-1">
             Tool: {message.tool_calls?.[0]?.function?.name || 'unknown'}
@@ -65,7 +128,7 @@ export default function MessageBubble({ message, onEdit }: MessageBubbleProps) {
   const isUser = message.role === 'user'
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} py-1`}>
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} py-1 animate-message-in`}>
       <div className={`relative group ${isUser ? 'max-w-[75%]' : 'max-w-full w-full'}`}>
         {/* Tool calls (assistant only) */}
         {message.tool_calls && message.tool_calls.length > 0 && !isUser && (
@@ -74,17 +137,19 @@ export default function MessageBubble({ message, onEdit }: MessageBubbleProps) {
           </div>
         )}
 
-        {/* User message — bubble style */}
+        {/* User message -- bubble style */}
         {isUser && message.content && !editing && (
           <div className="bg-warm-bubble rounded-2xl px-5 py-3 inline-block max-w-full">
             <div className="user-message text-warm-text">{message.content}</div>
           </div>
         )}
 
-        {/* AI message — no bubble, just flowing text */}
+        {/* AI message -- no bubble, just flowing text */}
         {!isUser && message.content && (
           <div className="markdown-content pr-4">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+              {message.content}
+            </ReactMarkdown>
           </div>
         )}
 
@@ -115,8 +180,17 @@ export default function MessageBubble({ message, onEdit }: MessageBubbleProps) {
           </div>
         )}
 
-        {/* Action buttons (timestamp + copy/edit) */}
+        {/* Action buttons (timestamp + copy/edit/regenerate/export) */}
         <div className={`flex items-center gap-1 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity ${isUser ? 'justify-end pr-1' : 'pl-0.5'}`}>
+          {isLastAssistant && onRegenerate && (
+            <button
+              onClick={onRegenerate}
+              className="text-warm-muted hover:text-blue p-0.5"
+              title="Regenerate"
+            >
+              <RefreshCw size={11} />
+            </button>
+          )}
           {message.content && (
             <button
               onClick={handleCopy}

@@ -51,3 +51,13 @@ BUILD-backend.md
 
 # Handoff docs
 PROGRESS.md
+
+# API keys
+backend/_key.py
+backend/.test_key
+check_key.py
+backend/tests/key_debug.py
+
+# Tunnel scripts
+tunnel.py
+start_tunnel.py

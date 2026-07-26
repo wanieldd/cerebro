@@ -33,6 +33,7 @@ export default function ChatInput({ onSend, onStop, isLoading, pendingPrompt }: 
   const [files, setFiles] = useState<UploadResult[]>([])
   const [pasted, setPasted] = useState<PastedItem[]>([])
   const [uploading, setUploading] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -167,8 +168,76 @@ export default function ChatInput({ onSend, onStop, isLoading, pendingPrompt }: 
 
   const hasAttachments = files.length > 0 || pasted.length > 0
 
+  // ── Drag & Drop ──
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(false)
+  }
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(false)
+
+    const droppedFiles = e.dataTransfer?.files
+    if (!droppedFiles || droppedFiles.length === 0) return
+
+    setUploading(true)
+    try {
+      // Check if they're pastable blobs (images) or uploadable files
+      const results: UploadResult[] = []
+      const pastedItems: PastedItem[] = []
+
+      for (let i = 0; i < droppedFiles.length; i++) {
+        const file = droppedFiles[i]
+        if (file.type.startsWith('image/') || file.size < 1024 * 1024) {
+          // Small files or images can be pasted as blobs (instant preview)
+          const id = 'drop-' + Date.now() + '-' + i
+          const url = URL.createObjectURL(file)
+          const isImage = file.type.startsWith('image/')
+          pastedItems.push({
+            id,
+            filename: file.name,
+            url,
+            blob: file,
+            type: isImage ? 'image' : 'file',
+          })
+        } else {
+          // Larger files upload directly
+          try {
+            results.push(await uploadFile(file))
+          } catch { /* skip failed */ }
+        }
+      }
+
+      if (pastedItems.length > 0) setPasted((prev) => [...prev, ...pastedItems])
+      if (results.length > 0) setFiles((prev) => [...prev, ...results])
+    } finally {
+      setUploading(false)
+    }
+  }
+
   return (
-    <div className="border-t border-warm-border bg-warm-bg" onPaste={handlePaste}>
+    <div
+      className="border-t border-warm-border bg-warm-bg relative"
+      onPaste={handlePaste}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Drag overlay */}
+      {dragOver && (
+        <div className="absolute inset-0 bg-blue/10 border-2 border-dashed border-blue rounded-lg z-20 flex items-center justify-center">
+          <div className="text-blue text-sm font-medium">Drop files here</div>
+        </div>
+      )}
       {/* Params panel */}
       {showParams && (
         <div className="px-4 py-3 border-b border-warm-border bg-warm-surface">
@@ -203,7 +272,7 @@ export default function ChatInput({ onSend, onStop, isLoading, pendingPrompt }: 
       {hasAttachments && (
         <div className="px-4 py-2.5">
           <div className="max-w-3xl mx-auto flex flex-wrap gap-2">
-            {/* Pasted images — show thumbnail */}
+            {/* Pasted images -- show thumbnail */}
             {pasted.map((p) => (
               <div key={p.id} className="relative group w-16 h-16 rounded-lg overflow-hidden border border-warm-border bg-warm-elevated shrink-0">
                 {p.type === 'image' ? (

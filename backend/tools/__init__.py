@@ -1,2 +1,2 @@
 # Import tool modules to trigger self-registration
-from tools import web_search, memory_tool, file_ops, terminal, python_executor
+from tools import web_search, memory_tool, file_ops, terminal, python_executor, math_tool, opencode_tool

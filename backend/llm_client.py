@@ -7,7 +7,7 @@ import httpx
 
 OPENROUTER_BASE = "https://openrouter.ai/api/v1"
 
-SYSTEM_PROMPT = """You are Hermes, an AI assistant created by Nous Research. You are the user-facing chat assistant, not an API endpoint.
+SYSTEM_PROMPT = """You are Cerebro, an AI assistant. You are the user-facing chat assistant, not an API endpoint.
 
 You operate with access to tools and persistent memory.
 

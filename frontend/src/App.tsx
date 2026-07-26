@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { MessageSquare, Plus, Trash2, Brain, Settings as SettingsIcon, Search, Key, FileText, AlertTriangle } from 'lucide-react'
-import type { Conversation, Message as MessageType, SSEEvent, Prompt, ChatParams } from './types'
+import { MessageSquare, Plus, Trash2, Brain, Settings as SettingsIcon, Search, Key, FileText, AlertTriangle, Menu, X } from 'lucide-react'
+import type { Conversation, Message as MessageType, SSEEvent, Prompt, ChatParams, Project, ProjectDetail } from './types'
 import * as api from './api/client'
 import type { AuthStatus } from './api/client'
 import ChatView from './components/ChatView'
@@ -9,7 +9,8 @@ import MemoryManager from './components/MemoryManager'
 import PromptLibrary from './components/PromptLibrary'
 import OnboardingWizard from './components/OnboardingWizard'
 import SignIn from './components/SignIn'
-
+import ProjectSidebar from './components/ProjectSidebar'
+import ProjectView from './components/ProjectView'
 import ConfirmDialog from './components/ConfirmDialog'
 import { ToastProvider, useToast } from './components/Toast'
 
@@ -36,6 +37,11 @@ function AppInner() {
   const [deleteConfirming, setDeleteConfirming] = useState<string | null>(null)
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('hermes_ui_api_key') || '')
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
+  const [showNewProject, setShowNewProject] = useState(false)
+  const [editingTitleConvId, setEditingTitleConvId] = useState<string | null>(null)
+  const [editingTitle, setEditingTitle] = useState('')
   const abortRef = useRef<AbortController | null>(null)
   const generationRef = useRef(0)
 
@@ -54,11 +60,12 @@ function AppInner() {
     })
   }, [])
 
-  // Data fetching — must be BEFORE early returns so hook count stays consistent
+  // Data fetching -- must be BEFORE early returns so hook count stays consistent
   useEffect(() => {
     api.getConversations().then(setConversations).catch(() => {})
     api.getFolders().then(setFolders).catch(() => {})
     api.getPrompts().then(setPrompts).catch(() => {})
+    api.getProjects().then(setProjects).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -112,10 +119,12 @@ function AppInner() {
     setMessages((prev) => prev.filter((m) => m.id !== 'streaming-placeholder'))
   }, [])
 
-  const handleNewChat = useCallback(async () => {
-    const conv = await api.createConversation(undefined, activeFolder || undefined)
+  const handleNewChat = useCallback(async (projectId?: string) => {
+    const folder = projectId || activeFolder || undefined
+    const conv = await api.createConversation(undefined, folder)
     setConversations((prev) => [conv, ...prev])
     setActiveConvId(conv.id)
+    setActiveProjectId(null)
     setMessages([])
     setStreamingContent('')
     setStreamingToolCalls([])
@@ -141,6 +150,60 @@ function AppInner() {
     addToast('Conversation deleted', 'success')
   }, [deleteConfirming, activeConvId])
 
+  const handleSelectProject = useCallback((id: string | null) => {
+    if (id === null) {
+      setActiveProjectId(null)
+      setPage('chat')
+    } else {
+      setActiveProjectId(id)
+    }
+  }, [])
+
+  const handleNewProject = useCallback(async () => {
+    const name = prompt('Project name:')
+    if (!name?.trim()) return
+    try {
+      const project = await api.createProject(name.trim())
+      setProjects((prev) => [...prev, project])
+      setActiveProjectId(project.id)
+    } catch (e) {
+      addToast('Failed to create project', 'error')
+    }
+  }, [])
+
+  const handleEditProject = useCallback((id: string) => {
+    setActiveProjectId(id)
+  }, [])
+
+  const handleDeleteProject = useCallback(async (id: string) => {
+    try {
+      await api.deleteProject(id)
+      setProjects((prev) => prev.filter((p) => p.id !== id))
+      if (activeProjectId === id) setActiveProjectId(null)
+      addToast('Project deleted', 'success')
+    } catch (e) {
+      addToast('Failed to delete project', 'error')
+    }
+  }, [activeProjectId])
+
+  const handleRenameConv = useCallback(async (id: string, title: string) => {
+    if (!title.trim()) return
+    try {
+      await api.updateConversation(id, { title: title.trim() })
+      setConversations((prev) => prev.map((c) => c.id === id ? { ...c, title: title.trim() } : c))
+      addToast('Conversation renamed', 'success')
+    } catch (e) {
+      addToast('Failed to rename', 'error')
+    }
+    setEditingTitleConvId(null)
+  }, [])
+
+  const handleOpenConversation = useCallback((id: string) => {
+    setActiveConvId(id)
+    setActiveProjectId(null)
+    setPage('chat')
+  }, [])
+
   const handleSendMessage = useCallback(async (content: string, params?: ChatParams) => {
     if (isStreaming) return
     setError(null)
@@ -154,7 +217,7 @@ function AppInner() {
 
     let convId = activeConvId
     if (!convId) {
-      const conv = await api.createConversation(undefined, activeFolder || undefined)
+      const conv = await api.createConversation(undefined, activeFolder || activeProjectId || undefined)
       setConversations((prev) => [conv, ...prev])
       setActiveConvId(conv.id)
       convId = conv.id
@@ -280,6 +343,65 @@ function AppInner() {
     }
   }, [activeConvId, apiKey, model])
 
+  const handleRegenerate = useCallback(async () => {
+    const convId = activeConvId
+    if (!convId || isStreaming) return
+    setError(null)
+
+    generationRef.current += 1
+    const gen = generationRef.current
+    abortRef.current?.abort()
+
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    if (!apiKey) {
+      setError('Set your API key in Settings to send messages')
+      return
+    }
+
+    setIsStreaming(true); setStreamingContent(''); setStreamingToolCalls([])
+
+    // Remove the last assistant message and add streaming placeholder
+    setMessages((prev) => {
+      const trimmed = prev.filter((m) => m.role !== 'assistant')
+      return [...trimmed, { id: 'streaming-placeholder', conversation_id: convId, role: 'assistant', content: '', created_at: new Date().toISOString() }]
+    })
+
+    try {
+      let accumulated = ''
+      for await (const event of api.streamRegenerate(convId, apiKey, model || undefined, controller.signal)) {
+        if (gen !== generationRef.current) return
+        if (event.type === 'token') {
+          accumulated += event.content || ''
+          setStreamingContent(accumulated)
+          setMessages((prev) => {
+            const msgs = [...prev]; const last = msgs[msgs.length - 1]
+            if (last?.id === 'streaming-placeholder') msgs[msgs.length - 1] = { ...last, content: accumulated }
+            return msgs
+          })
+        } else if (event.type === 'tool_call') {
+          setStreamingToolCalls((prev) => [...prev, event])
+        } else if (event.type === 'tool_result') {
+          setStreamingToolCalls((prev) => prev.map((tc) => tc.id === event.id ? { ...tc, result: event.content } : tc))
+        } else if (event.type === 'done') {
+          const data = await api.getConversation(convId)
+          setMessages(data.messages); setStreamingContent(''); setStreamingToolCalls([])
+        } else if (event.type === 'error') {
+          setError(event.content || ''); setMessages((prev) => prev.filter((m) => m.id !== 'streaming-placeholder'))
+          setStreamingContent(''); setStreamingToolCalls([])
+        }
+      }
+    } catch (err: unknown) {
+      if (gen !== generationRef.current) return
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      setError(err instanceof Error ? err.message : 'Request failed')
+      setMessages((prev) => prev.filter((m) => m.id !== 'streaming-placeholder'))
+    } finally {
+      setIsStreaming(false); setStreamingContent(''); setStreamingToolCalls([])
+    }
+  }, [activeConvId, apiKey, model, isStreaming])
+
   const displayedConversations = searchResults !== null ? searchResults
     : activeFolder ? conversations.filter((c) => c.folder === activeFolder) : conversations
 
@@ -328,152 +450,209 @@ function AppInner() {
 
   return (
     <div className="flex h-screen bg-warm-bg text-warm-text">
-      {/* Sidebar */}
+      {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
-              <aside className="w-56 bg-warm-surface border-r border-warm-border flex flex-col shrink-0">
-                {/* Branding */}
-                <div className="px-3 py-3 border-b border-warm-border flex items-center gap-2">
-                  <div className="w-7 h-7 bg-blue rounded-lg flex items-center justify-center shrink-0">
-                    <MessageSquare size={14} className="text-black" />
-                  </div>
-                  <span
-                    className="text-sm font-semibold text-warm-text"
-                    style={{ fontFamily: 'var(--font-serif)' }}
-                  >
-                    Cerebro
-                  </span>
-                </div>
-
-                <div className="p-2 border-b border-warm-border">
-            <div className="relative">
-              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-warm-muted" />
-              <input
-                type="text" value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search..."
-                className="w-full bg-warm-bg border border-warm-border rounded-lg pl-8 pr-3 py-1.5 text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-blue text-xs"
-              />
-            </div>
-          </div>
-
-          <div className="p-2">
-            <button
-              onClick={handleNewChat}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-warm-border text-warm-muted hover:text-warm-text hover:bg-warm-elevated transition-colors text-sm"
-            >
-              <Plus size={16} />
-              New Chat
-            </button>
-          </div>
-
-          {folders.length > 0 && (
-            <div className="px-2 pb-1 flex gap-1 overflow-x-auto">
-              <button
-                onClick={() => setActiveFolder(null)}
-                className={`px-2 py-1 rounded text-xs whitespace-nowrap transition-colors ${
-                  activeFolder === null ? 'bg-blue/20 text-blue' : 'text-warm-muted hover:text-warm-text'
-                }`}
-              >
-                All
-              </button>
-              {folders.map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setActiveFolder(f)}
-                  className={`px-2 py-1 rounded text-xs whitespace-nowrap transition-colors ${
-                    activeFolder === f ? 'bg-blue/20 text-blue' : 'text-warm-muted hover:text-warm-text'
-                  }`}
-                >
-                  {f}
-                </button>
-              ))}
-            </div>
-          )}
-
-          <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
-            {displayedConversations.length === 0 && (
-              <div className="text-warm-muted text-xs text-center py-4">
-                {searchQuery ? 'No results' : 'No conversations'}
-              </div>
-            )}
-            {displayedConversations.map((conv) => (
-              <div
-                key={conv.id}
-                className={`group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer text-sm transition-colors ${
-                  activeConvId === conv.id
-                    ? 'bg-warm-elevated text-warm-text'
-                    : 'text-warm-muted hover:bg-warm-elevated hover:text-warm-text'
-                }`}
-                onClick={() => { setActiveConvId(conv.id); setPage('chat'); setSearchQuery(''); setSearchResults(null) }}
-              >
-                <MessageSquare size={14} className="shrink-0 text-warm-muted" />
-                <span className="flex-1 truncate">{conv.title}</span>
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleDeleteConv(conv.id) }}
-                  className="opacity-40 hover:opacity-100 hover:text-warm-danger transition-opacity"
-                  title="Delete conversation"
-                >
-                  <Trash2 size={13} />
-                </button>
-              </div>
-            ))}
-          </div>
-
-          <div className="p-2 border-t border-warm-border space-y-0.5">
-            <button
-              onClick={() => setPage('prompts')}
-              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                page === 'prompts' ? 'bg-warm-elevated text-warm-text' : 'text-warm-muted hover:bg-warm-elevated hover:text-warm-text'
-              }`}
-            >
-              <FileText size={16} />
-              Prompts
-              <span className="ml-auto text-xs text-warm-muted/60">{prompts.length}</span>
-            </button>
-            <button
-              onClick={() => setPage('memories')}
-              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                page === 'memories' ? 'bg-warm-elevated text-warm-text' : 'text-warm-muted hover:bg-warm-elevated hover:text-warm-text'
-              }`}
-            >
-              <Brain size={16} />
-              Memories
-            </button>
-            <button
-              onClick={() => setPage('settings')}
-              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                page === 'settings' ? 'bg-warm-elevated text-warm-text' : 'text-warm-muted hover:bg-warm-elevated hover:text-warm-text'
-              }`}
-            >
-              <SettingsIcon size={16} />
-              Settings
-            </button>
-            {!apiKey && (
-              <div className="flex items-center gap-2 px-3 py-2 text-xs text-blue">
-                <Key size={12} />
-                No API key set
-              </div>
-            )}
-          </div>
-        </aside>
+        <div
+          className="fixed inset-0 bg-black/50 z-10 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
       )}
 
-      <div className="flex-1 flex flex-col min-w-0">
-        <div className="md:hidden flex items-center gap-2 p-2 border-b border-warm-border bg-warm-surface">
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 hover:bg-warm-elevated rounded-lg">
-            <MessageSquare size={18} />
+      {/* Sidebar — inline on desktop, drawer on mobile */}
+      <aside className={`
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        md:translate-x-0 md:static md:w-56 md:shrink-0
+        fixed inset-y-0 left-0 z-20 w-64
+        bg-warm-surface border-r border-warm-border flex flex-col
+        transition-transform duration-200 ease-out
+      `}>
+        {/* Branding with close button (mobile) */}
+        <div className="px-3 py-3 border-b border-warm-border flex items-center gap-2">
+          <div className="w-7 h-7 bg-blue rounded-lg flex items-center justify-center shrink-0">
+            <MessageSquare size={14} className="text-black" />
+          </div>
+          <span
+            className="text-sm font-semibold text-warm-text flex-1"
+            style={{ fontFamily: 'var(--font-serif)' }}
+          >
+            Cerebro
+          </span>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="md:hidden p-1 text-warm-muted hover:text-warm-text transition-colors"
+          >
+            <X size={16} />
           </button>
-          <span className="text-sm font-medium truncate">
+        </div>
+
+        <div className="p-2 border-b border-warm-border">
+          <div className="relative">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-warm-muted" />
+            <input
+              type="text" value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search..."
+              className="w-full bg-warm-bg border border-warm-border rounded-lg pl-8 pr-3 py-1.5 text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-blue text-xs"
+            />
+          </div>
+        </div>
+
+        <div className="p-2">
+          <button
+            onClick={() => { handleNewChat(); setSidebarOpen(false) }}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-warm-border text-warm-muted hover:text-warm-text hover:bg-warm-elevated transition-colors text-sm"
+          >
+            <Plus size={16} />
+            New Chat
+          </button>
+        </div>
+
+        <ProjectSidebar
+          projects={projects}
+          activeProjectId={activeProjectId}
+          onSelectProject={(id) => { handleSelectProject(id); setSidebarOpen(false) }}
+          onNewProject={handleNewProject}
+          onEditProject={handleEditProject}
+          onDeleteProject={handleDeleteProject}
+        />
+
+        {folders.length > 0 && (
+          <div className="px-2 pb-1 flex gap-1 overflow-x-auto">
+            <button
+              onClick={() => setActiveFolder(null)}
+              className={`px-2 py-1 rounded text-xs whitespace-nowrap transition-colors ${
+                activeFolder === null ? 'bg-blue/20 text-blue' : 'text-warm-muted hover:text-warm-text'
+              }`}
+            >
+              All
+            </button>
+            {folders.map((f) => (
+              <button
+                key={f}
+                onClick={() => setActiveFolder(f)}
+                className={`px-2 py-1 rounded text-xs whitespace-nowrap transition-colors ${
+                  activeFolder === f ? 'bg-blue/20 text-blue' : 'text-warm-muted hover:text-warm-text'
+                }`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+          {displayedConversations.length === 0 && (
+            <div className="text-warm-muted text-xs text-center py-4">
+              {searchQuery ? 'No results' : 'No conversations'}
+            </div>
+          )}
+          {displayedConversations.map((conv, index) => (
+            <div
+              key={conv.id}
+              className={`group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer text-sm transition-colors animate-slide-in-left ${
+                activeConvId === conv.id
+                  ? 'bg-warm-elevated text-warm-text'
+                  : 'text-warm-muted hover:bg-warm-elevated hover:text-warm-text'
+              }`}
+              style={{ animationDelay: `${Math.min(index * 0.03, 0.3)}s` }}
+              onClick={() => { setActiveConvId(conv.id); setPage('chat'); setSearchQuery(''); setSearchResults(null); setSidebarOpen(false) }}
+              onDoubleClick={(e) => { e.stopPropagation(); setEditingTitleConvId(conv.id); setEditingTitle(conv.title) }}
+            >
+              <MessageSquare size={14} className="shrink-0 text-warm-muted" />
+              {editingTitleConvId === conv.id ? (
+                <input
+                  type="text"
+                  value={editingTitle}
+                  onChange={(e) => setEditingTitle(e.target.value)}
+                  onBlur={() => handleRenameConv(conv.id, editingTitle)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') { e.stopPropagation(); handleRenameConv(conv.id, editingTitle) }
+                    if (e.key === 'Escape') { e.stopPropagation(); setEditingTitleConvId(null) }
+                  }}
+                  className="flex-1 bg-warm-bg border border-blue rounded px-1.5 py-0.5 text-warm-text text-xs focus:outline-none"
+                  autoFocus
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <span className="flex-1 truncate">{conv.title}</span>
+              )}
+              <button
+                onClick={(e) => { e.stopPropagation(); handleDeleteConv(conv.id) }}
+                className="opacity-40 hover:opacity-100 hover:text-warm-danger transition-opacity"
+                title="Delete conversation"
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div className="p-2 border-t border-warm-border space-y-0.5">
+          <button
+            onClick={() => { setPage('prompts'); setSidebarOpen(false) }}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+              page === 'prompts' ? 'bg-warm-elevated text-warm-text' : 'text-warm-muted hover:bg-warm-elevated hover:text-warm-text'
+            }`}
+          >
+            <FileText size={16} />
+            Prompts
+            <span className="ml-auto text-xs text-warm-muted/60">{prompts.length}</span>
+          </button>
+          <button
+            onClick={() => { setPage('memories'); setSidebarOpen(false) }}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+              page === 'memories' ? 'bg-warm-elevated text-warm-text' : 'text-warm-muted hover:bg-warm-elevated hover:text-warm-text'
+            }`}
+          >
+            <Brain size={16} />
+            Memories
+          </button>
+          <button
+            onClick={() => { setPage('settings'); setSidebarOpen(false) }}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+              page === 'settings' ? 'bg-warm-elevated text-warm-text' : 'text-warm-muted hover:bg-warm-elevated hover:text-warm-text'
+            }`}
+          >
+            <SettingsIcon size={16} />
+            Settings
+          </button>
+          {!apiKey && (
+            <div className="flex items-center gap-2 px-3 py-2 text-xs text-blue">
+              <Key size={12} />
+              No API key set
+            </div>
+          )}
+        </div>
+      </aside>
+
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Mobile header with hamburger */}
+        <div className="md:hidden flex items-center gap-2 px-3 py-2.5 border-b border-warm-border bg-warm-surface shrink-0">
+          <button onClick={() => setSidebarOpen(true)} className="p-1.5 hover:bg-warm-elevated rounded-lg text-warm-muted hover:text-warm-text transition-colors">
+            <Menu size={20} />
+          </button>
+          <span className="text-sm font-medium truncate text-warm-text">
             {conversations.find((c) => c.id === activeConvId)?.title || 'Cerebro'}
           </span>
         </div>
 
-        {page === 'chat' && (
+        {page === 'chat' && !activeProjectId && (
           <ChatView
             messages={messages} isStreaming={isStreaming} streamingContent={streamingContent}
             streamingToolCalls={streamingToolCalls} onSend={handleSendMessage}
-            onEditResubmit={handleEditResubmit} onStop={handleStopGeneration}
+            onEditResubmit={handleEditResubmit} onRegenerate={handleRegenerate}
+            onStop={handleStopGeneration}
             hasApiKey={!!apiKey} error={error} prompts={prompts} pendingPrompt={pendingPrompt}
+            conversationId={activeConvId}
+          />
+        )}
+        {page === 'chat' && activeProjectId && (
+          <ProjectView
+            projectId={activeProjectId}
+            onBack={() => setActiveProjectId(null)}
+            onOpenConversation={handleOpenConversation}
+            onNewChat={handleNewChat}
+            onRefresh={() => api.getProjects().then(setProjects)}
           />
         )}
         {page === 'settings' && (

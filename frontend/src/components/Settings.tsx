@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Check, X, Eye, Sliders, MessageSquare, Cpu, Database, User, LogOut, KeyRound } from 'lucide-react'
-import { validateApiKey, getModels, getSessionToken, clearSessionToken, signout, changePassword as apiChangePassword, getAuthStatus } from '../api/client'
+import { ArrowLeft, Check, X, Eye, Sliders, MessageSquare, Cpu, Database, User, LogOut, KeyRound, Plus, Trash2, BookTemplate } from 'lucide-react'
+import { validateApiKey, getModels, getSessionToken, clearSessionToken, signout, changePassword as apiChangePassword, getAuthStatus, getPromptPresets, createPromptPreset, deletePromptPreset } from '../api/client'
 import ModelSelector from './ModelSelector'
 
 interface SettingsProps {
@@ -97,6 +97,9 @@ export default function Settings({ onBack }: SettingsProps) {
   const [pwError, setPwError] = useState('')
   const [pwSuccess, setPwSuccess] = useState(false)
   const [changingPw, setChangingPw] = useState(false)
+  // Prompt presets
+  const [promptPresets, setPromptPresets] = useState<{ id: string; name: string; content: string }[]>([])
+  const [presetName, setPresetName] = useState('')
 
   useEffect(() => {
     const savedKey = localStorage.getItem(KEYS.API_KEY) || ''
@@ -113,17 +116,17 @@ export default function Settings({ onBack }: SettingsProps) {
     getAuthStatus().then((s) => {
       if (s.user) setUser({ username: s.user.username, display_name: s.user.display_name })
     }).catch(() => {})
+    // Load prompt presets
+    getPromptPresets().then(setPromptPresets).catch(() => {})
   }, [])
 
-  // Debounce API key save
+  // Save API key immediately (localStorage is sync, no debounce needed)
   useEffect(() => {
-    const timer = setTimeout(() => {
-      save(KEYS.API_KEY, apiKey)
-    }, 300)
-    return () => clearTimeout(timer)
+    if (apiKey) save(KEYS.API_KEY, apiKey)
+    else localStorage.removeItem(KEYS.API_KEY)
   }, [apiKey])
 
-  // Debounce system prompt save
+  // Debounce system prompt save only
   useEffect(() => {
     const timer = setTimeout(() => {
       save(KEYS.SYSTEM_PROMPT, systemPrompt)
@@ -195,6 +198,30 @@ export default function Settings({ onBack }: SettingsProps) {
       setPwError(e.message || 'Failed to change password')
     } finally {
       setChangingPw(false)
+    }
+  }
+
+  const handleSavePreset = async () => {
+    if (!presetName.trim() || !systemPrompt.trim()) return
+    try {
+      const preset = await createPromptPreset(presetName.trim(), systemPrompt)
+      setPromptPresets((prev) => [...prev, preset])
+      setPresetName('')
+    } catch (e: any) {
+      console.error('Failed to save preset:', e)
+    }
+  }
+
+  const handleLoadPreset = (content: string) => {
+    setSystemPrompt(content)
+  }
+
+  const handleDeletePreset = async (id: string) => {
+    try {
+      await deletePromptPreset(id)
+      setPromptPresets((prev) => prev.filter((p) => p.id !== id))
+    } catch (e: any) {
+      console.error('Failed to delete preset:', e)
     }
   }
 
@@ -347,6 +374,53 @@ export default function Settings({ onBack }: SettingsProps) {
               className="w-full bg-warm-bg border border-warm-border rounded-lg px-3 py-2 text-sm text-warm-text placeholder-warm-muted resize-none focus:outline-none focus:ring-2 focus:ring-blue"
             />
             <p className="text-[10px] text-warm-muted/60">These instructions are added to the system prompt for every conversation.</p>
+          </OptionGroup>
+
+          {/* Prompt Presets */}
+          <OptionGroup label="Saved Presets">
+            <div className="space-y-2">
+              {promptPresets.length === 0 ? (
+                <p className="text-xs text-warm-muted">No presets saved yet.</p>
+              ) : (
+                promptPresets.map((p) => (
+                  <div key={p.id} className="flex items-center gap-2 bg-warm-bg rounded-lg px-3 py-2">
+                    <BookTemplate size={14} className="text-blue shrink-0" />
+                    <button
+                      onClick={() => handleLoadPreset(p.content)}
+                      className="flex-1 text-left text-xs text-warm-text hover:text-blue truncate transition-colors"
+                      title={`Load: ${p.name}`}
+                    >
+                      {p.name}
+                    </button>
+                    <button
+                      onClick={() => handleDeletePreset(p.id)}
+                      className="text-warm-muted hover:text-warm-danger transition-colors shrink-0"
+                      title="Delete preset"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))
+              )}
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={presetName}
+                  onChange={(e) => setPresetName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSavePreset() } }}
+                  placeholder="Preset name..."
+                  className="flex-1 bg-warm-bg border border-warm-border rounded-lg px-3 py-1.5 text-xs text-warm-text placeholder-warm-muted focus:outline-none focus:ring-2 focus:ring-blue"
+                />
+                <button
+                  onClick={handleSavePreset}
+                  disabled={!presetName.trim() || !systemPrompt.trim()}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-blue text-black rounded-lg hover:opacity-90 transition-all text-xs font-medium disabled:opacity-50"
+                >
+                  <Plus size={12} />
+                  Save
+                </button>
+              </div>
+            </div>
           </OptionGroup>
         </Section>
 

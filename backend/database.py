@@ -90,6 +90,79 @@ async def init_db() -> None:
         except Exception:
             pass
 
+        # Create projects table
+        try:
+            await db.executescript("""
+                CREATE TABLE IF NOT EXISTS projects (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    description TEXT DEFAULT '',
+                    context TEXT DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+            """)
+            await db.commit()
+        except Exception:
+            pass
+
+        # Safe migration: add project_id column to conversations
+        try:
+            await db.execute("ALTER TABLE conversations ADD COLUMN project_id TEXT DEFAULT ''")
+            await db.commit()
+        except Exception:
+            pass
+
+        # Create prompt_presets table
+        try:
+            await db.executescript("""
+                CREATE TABLE IF NOT EXISTS prompt_presets (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    content TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+            """)
+            await db.commit()
+        except Exception:
+            pass
+
+        # Create documents table
+        try:
+            await db.executescript("""
+                CREATE TABLE IF NOT EXISTS documents (
+                    id TEXT PRIMARY KEY,
+                    project_id TEXT DEFAULT '',
+                    title TEXT NOT NULL DEFAULT 'Untitled',
+                    content TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+            """)
+            await db.commit()
+        except Exception:
+            pass
+
+        # Create scheduled_tasks table
+        try:
+            await db.executescript("""
+                CREATE TABLE IF NOT EXISTS scheduled_tasks (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    prompt TEXT NOT NULL,
+                    schedule TEXT NOT NULL,
+                    model TEXT DEFAULT '',
+                    enabled INTEGER DEFAULT 1,
+                    last_run TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+            """)
+            await db.commit()
+        except Exception:
+            pass
+
         # Create FTS5 virtual table with triggers
         try:
             await db.executescript("""
@@ -573,5 +646,307 @@ async def update_password(user_id: str, current_password: str, new_password: str
         )
         await db.commit()
         return True
+    finally:
+        await db.close()
+
+
+# ── Projects ──
+
+async def get_projects() -> list[dict]:
+    db = await get_db()
+    try:
+        rows = await db.execute_fetchall(
+            "SELECT p.*, (SELECT COUNT(*) FROM conversations c WHERE c.project_id = p.id AND c.project_id != '') as conv_count FROM projects p ORDER BY p.updated_at DESC"
+        )
+        return [dict(r) for r in rows]
+    finally:
+        await db.close()
+
+async def create_project(name: str, description: str = "", context: str = "") -> dict:
+    db = await get_db()
+    try:
+        now = _now()
+        pid = _uid()
+        await db.execute(
+            "INSERT INTO projects (id, name, description, context, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (pid, name, description, context, now, now),
+        )
+        await db.commit()
+        return {"id": pid, "name": name, "description": description, "context": context, "conv_count": 0, "created_at": now, "updated_at": now}
+    finally:
+        await db.close()
+
+async def get_project(pid: str) -> dict | None:
+    db = await get_db()
+    try:
+        cur = await db.execute(
+            "SELECT p.*, (SELECT COUNT(*) FROM conversations c WHERE c.project_id = p.id) as conv_count FROM projects p WHERE p.id = ?", (pid,)
+        )
+        row = await cur.fetchone()
+        return dict(row) if row else None
+    finally:
+        await db.close()
+
+async def update_project(pid: str, name: str | None = None, description: str | None = None, context: str | None = None) -> bool:
+    db = await get_db()
+    try:
+        now = _now()
+        updates = []
+        params = []
+        if name is not None:
+            updates.append("name = ?"); params.append(name)
+        if description is not None:
+            updates.append("description = ?"); params.append(description)
+        if context is not None:
+            updates.append("context = ?"); params.append(context)
+        if not updates:
+            return False
+        updates.append("updated_at = ?"); params.append(now)
+        params.append(pid)
+        cur = await db.execute(f"UPDATE projects SET {', '.join(updates)} WHERE id = ?", params)
+        await db.commit()
+        return cur.rowcount > 0
+    finally:
+        await db.close()
+
+async def delete_project(pid: str) -> bool:
+    db = await get_db()
+    try:
+        # Remove project_id from conversations in this project
+        await db.execute("UPDATE conversations SET project_id = '' WHERE project_id = ?", (pid,))
+        cur = await db.execute("DELETE FROM projects WHERE id = ?", (pid,))
+        await db.commit()
+        return cur.rowcount > 0
+    finally:
+        await db.close()
+
+async def get_conversations_by_project(pid: str) -> list[dict]:
+    db = await get_db()
+    try:
+        rows = await db.execute_fetchall(
+            "SELECT id, title, created_at, updated_at FROM conversations WHERE project_id = ? ORDER BY updated_at DESC",
+            (pid,),
+        )
+        return [dict(r) for r in rows]
+    finally:
+        await db.close()
+
+
+# ── Documents ──
+
+async def get_documents(project_id: str = "") -> list[dict]:
+    db = await get_db()
+    try:
+        if project_id:
+            rows = await db.execute_fetchall(
+                "SELECT id, project_id, title, created_at, updated_at FROM documents WHERE project_id = ? ORDER BY updated_at DESC",
+                (project_id,),
+            )
+        else:
+            rows = await db.execute_fetchall(
+                "SELECT id, project_id, title, created_at, updated_at FROM documents ORDER BY updated_at DESC"
+            )
+        return [dict(r) for r in rows]
+    finally:
+        await db.close()
+
+async def create_document(project_id: str, title: str = "Untitled", content: str = "") -> dict:
+    db = await get_db()
+    try:
+        now = _now()
+        did = _uid()
+        await db.execute(
+            "INSERT INTO documents (id, project_id, title, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (did, project_id, title, content, now, now),
+        )
+        await db.commit()
+        return {"id": did, "project_id": project_id, "title": title, "content": content, "created_at": now, "updated_at": now}
+    finally:
+        await db.close()
+
+async def get_document(did: str) -> dict | None:
+    db = await get_db()
+    try:
+        cur = await db.execute("SELECT * FROM documents WHERE id = ?", (did,))
+        row = await cur.fetchone()
+        return dict(row) if row else None
+    finally:
+        await db.close()
+
+async def update_document(did: str, title: str | None = None, content: str | None = None) -> bool:
+    db = await get_db()
+    try:
+        now = _now()
+        updates = []
+        params = []
+        if title is not None:
+            updates.append("title = ?"); params.append(title)
+        if content is not None:
+            updates.append("content = ?"); params.append(content)
+        if not updates:
+            return False
+        updates.append("updated_at = ?"); params.append(now)
+        params.append(did)
+        cur = await db.execute(f"UPDATE documents SET {', '.join(updates)} WHERE id = ?", params)
+        await db.commit()
+        return cur.rowcount > 0
+    finally:
+        await db.close()
+
+async def delete_document(did: str) -> bool:
+    db = await get_db()
+    try:
+        cur = await db.execute("DELETE FROM documents WHERE id = ?", (did,))
+        await db.commit()
+        return cur.rowcount > 0
+    finally:
+        await db.close()
+
+
+# ── Scheduled Tasks ──
+
+async def get_all_scheduled_tasks() -> list[dict]:
+    db = await get_db()
+    try:
+        rows = await db.execute_fetchall(
+            "SELECT id, name, prompt, schedule, model, enabled, last_run, created_at, updated_at FROM scheduled_tasks ORDER BY created_at DESC"
+        )
+        return [dict(r) for r in rows]
+    finally:
+        await db.close()
+
+async def get_scheduled_task(task_id: str) -> dict | None:
+    db = await get_db()
+    try:
+        cur = await db.execute(
+            "SELECT id, name, prompt, schedule, model, enabled, last_run, created_at, updated_at FROM scheduled_tasks WHERE id = ?",
+            (task_id,),
+        )
+        row = await cur.fetchone()
+        return dict(row) if row else None
+    finally:
+        await db.close()
+
+async def create_scheduled_task(name: str, prompt: str, schedule: str, model: str = "") -> dict:
+    db = await get_db()
+    try:
+        now = _now()
+        tid = _uid()
+        await db.execute(
+            "INSERT INTO scheduled_tasks (id, name, prompt, schedule, model, enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)",
+            (tid, name, prompt, schedule, model, now, now),
+        )
+        await db.commit()
+        return {"id": tid, "name": name, "prompt": prompt, "schedule": schedule, "model": model, "enabled": 1, "last_run": None, "created_at": now, "updated_at": now}
+    finally:
+        await db.close()
+
+async def update_scheduled_task(task_id: str, name: str | None = None, prompt: str | None = None, schedule: str | None = None, model: str | None = None, enabled: bool | None = None) -> bool:
+    db = await get_db()
+    try:
+        now = _now()
+        updates = []
+        params = []
+        if name is not None:
+            updates.append("name = ?"); params.append(name)
+        if prompt is not None:
+            updates.append("prompt = ?"); params.append(prompt)
+        if schedule is not None:
+            updates.append("schedule = ?"); params.append(schedule)
+        if model is not None:
+            updates.append("model = ?"); params.append(model)
+        if enabled is not None:
+            updates.append("enabled = ?"); params.append(1 if enabled else 0)
+        if not updates:
+            return False
+        updates.append("updated_at = ?"); params.append(now)
+        params.append(task_id)
+        cur = await db.execute(f"UPDATE scheduled_tasks SET {', '.join(updates)} WHERE id = ?", params)
+        await db.commit()
+        return cur.rowcount > 0
+    finally:
+        await db.close()
+
+async def delete_scheduled_task(task_id: str) -> bool:
+    db = await get_db()
+    try:
+        cur = await db.execute("DELETE FROM scheduled_tasks WHERE id = ?", (task_id,))
+        await db.commit()
+        return cur.rowcount > 0
+    finally:
+        await db.close()
+
+
+# ── Prompt Presets ──
+
+async def get_prompt_presets() -> list[dict]:
+    db = await get_db()
+    try:
+        rows = await db.execute_fetchall(
+            "SELECT id, name, content, created_at, updated_at FROM prompt_presets ORDER BY name ASC"
+        )
+        return [dict(r) for r in rows]
+    finally:
+        await db.close()
+
+async def create_prompt_preset(name: str, content: str) -> dict:
+    db = await get_db()
+    try:
+        now = _now()
+        pid = _uid()
+        await db.execute(
+            "INSERT INTO prompt_presets (id, name, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+            (pid, name, content, now, now),
+        )
+        await db.commit()
+        return {"id": pid, "name": name, "content": content, "created_at": now, "updated_at": now}
+    finally:
+        await db.close()
+
+async def update_prompt_preset(pid: str, name: str, content: str) -> bool:
+    db = await get_db()
+    try:
+        now = _now()
+        cur = await db.execute(
+            "UPDATE prompt_presets SET name = ?, content = ?, updated_at = ? WHERE id = ?",
+            (name, content, now, pid),
+        )
+        await db.commit()
+        return cur.rowcount > 0
+    finally:
+        await db.close()
+
+async def delete_prompt_preset(pid: str) -> bool:
+    db = await get_db()
+    try:
+        cur = await db.execute("DELETE FROM prompt_presets WHERE id = ?", (pid,))
+        await db.commit()
+        return cur.rowcount > 0
+    finally:
+        await db.close()
+
+
+# ── Conversation Export ──
+
+async def get_conversation_with_messages(cid: str) -> dict | None:
+    db = await get_db()
+    try:
+        cur = await db.execute(
+            "SELECT id, title, created_at, updated_at, folder FROM conversations WHERE id = ?", (cid,)
+        )
+        conv_row = await cur.fetchone()
+        if not conv_row:
+            return None
+        conv = dict(conv_row)
+        rows = await db.execute_fetchall(
+            "SELECT id, role, content, tool_calls, created_at FROM messages WHERE conversation_id = ? ORDER BY created_at ASC",
+            (cid,),
+        )
+        messages = []
+        for r in rows:
+            d = dict(r)
+            d["tool_calls"] = json.loads(d["tool_calls"]) if d.get("tool_calls") else None
+            messages.append(d)
+        return {"conversation": conv, "messages": messages}
     finally:
         await db.close()
